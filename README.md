@@ -59,7 +59,7 @@ packaging/build-rpm.sh
 ```
 
 ```bash
-sudo dnf install ./dist/superlion-0.7.1-1.fc44.noarch.rpm
+sudo dnf install ./dist/superlion-0.7.2-1.fc44.noarch.rpm
 ```
 
 Store trailers need an H.264 decoder (`gstreamer1-plugin-libav` or `gstreamer1-plugin-openh264`).

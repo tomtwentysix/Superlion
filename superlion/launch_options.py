@@ -84,6 +84,19 @@ CATALOGUE = {
     (ENV, "NVPRESENT_ENABLE_SMOOTH_MOTION"): Known(
         "Smooth Motion", "NVIDIA and DLSS", "Turns on NVIDIA Smooth Motion frame generation."
     ),
+    (ENV, "PROTON_NVIDIA_NVCUDA"): Known(
+        "NVIDIA CUDA", "NVIDIA and DLSS",
+        "Uses an alternative nvcuda.dll so games can use CUDA and GPU PhysX (Proton-CachyOS). "
+        "Not used in WoW64 mode.",
+    ),
+    (ENV, "VKLayer_DLSS5"): Known(
+        "DLSS 5 Vulkan Layer", "NVIDIA and DLSS",
+        "Turns on the experimental DLSS5VKLayer, which sends the game's frames to NVIDIA's neural rendering.",
+    ),
+    (ENV, "WINE_MOUSE_GRAB"): Known(
+        "Keep Mouse in Window", "Proton and Wine",
+        "Locks the mouse to the game window, so it cannot drift to another monitor or break mouse-look.",
+    ),
     (ENV, "VK_INSTANCE_LAYERS"): Known("Vulkan Layers", "Other Variables", "Vulkan layers to load, separated by colons.", ""),
     (ENV, "LD_PRELOAD"): Known(
         "Clear Preloaded Libraries", "Proton and Wine",
