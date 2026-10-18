@@ -49,8 +49,6 @@ class LaunchOptionsPage(Adw.PreferencesPage):
         for group in self.groups:
             self.add(group)
 
-    # Presets ---------------------------------------------------------------
-
     def _build_presets(self):
         group = Adw.PreferencesGroup(
             title="Presets",
@@ -105,8 +103,6 @@ class LaunchOptionsPage(Adw.PreferencesPage):
         alert.connect("response", on_response)
         alert.present(self.dialog)
 
-    # Settings added to the editor --------------------------------------------
-
     def _build_settings(self):
         group = Adw.PreferencesGroup(
             title="Added Settings",
@@ -140,8 +136,6 @@ class LaunchOptionsPage(Adw.PreferencesPage):
         dialog = AddLaunchSettingDialog(present, for_game=False)
         dialog.connect("added", lambda *_: self.refresh())
         dialog.present(self.dialog)
-
-    # Games' launch options ---------------------------------------------------
 
     def _build_games(self):
         group = Adw.PreferencesGroup(
