@@ -1,5 +1,5 @@
 Name:           superlion
-Version:        0.7.5
+Version:        0.7.6
 Release:        1%{?dist}
 Summary:        Native GNOME front end for your Steam library
 License:        GPL-3.0-or-later
@@ -63,6 +63,9 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/uk.co.solarflareit.Su
 %{_datadir}/icons/hicolor/*/apps/uk.co.solarflareit.Superlion*
 
 %changelog
+* Sun Oct 18 2026 Tom <tom@solarflareit.co.uk> - 0.7.6-1
+- Show screenshots and links to the project in GNOME Software.
+
 * Sun Oct 18 2026 Tom <tom@solarflareit.co.uk> - 0.7.5-1
 - Add a development mode that runs separately from the installed app, with its own settings and keys.
 
