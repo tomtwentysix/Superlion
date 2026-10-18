@@ -6,6 +6,7 @@ from gi.repository import Adw, Gtk
 
 from .. import config as config_mod
 from .. import sgdb, steam_paths
+from .launch_options_prefs import LaunchOptionsPage
 from .sgdb_setup import SgdbKeySetup
 from .webview import clear_sign_in
 from .wizard import account_choice, apply_account, apply_install, install_choices, library_groups, region_choice
@@ -25,7 +26,7 @@ class PreferencesDialog(Adw.PreferencesDialog):
         self.collect_libraries = library_groups(steam.add, self.state, lambda: self)
         self.add(steam)
 
-        accounts = Adw.PreferencesPage(title="Store and Accounts", icon_name="system-users-symbolic")
+        accounts = Adw.PreferencesPage(title="Accounts", icon_name="system-users-symbolic")
         self.region = region_choice(accounts.add, self.state)
         self.sign_in_group = Adw.PreferencesGroup(title="Steam Account")
         accounts.add(self.sign_in_group)
@@ -37,6 +38,7 @@ class PreferencesDialog(Adw.PreferencesDialog):
         setup_group.add(rerun)
         accounts.add(setup_group)
         self.add(accounts)
+        self.add(LaunchOptionsPage(self, window))
 
         self._skip_apply = False
         self._sign_in_rows = []
@@ -44,8 +46,6 @@ class PreferencesDialog(Adw.PreferencesDialog):
         self._show_sign_in()
         self._show_sgdb()
         self.connect("closed", lambda *_: self._apply())
-
-    # Steam sign-in -----------------------------------------------------------
 
     def _show_sign_in(self):
         for row in self._sign_in_rows:
@@ -91,8 +91,6 @@ class PreferencesDialog(Adw.PreferencesDialog):
         dialog = self.window.sign_in(parent=self)
         dialog.connect("signed-in", lambda *_: self._show_sign_in())
 
-    # SteamGridDB -------------------------------------------------------------
-
     def _show_sgdb(self):
         for row in self._sgdb_rows:
             self.sgdb_group.remove(row)
@@ -130,8 +128,6 @@ class PreferencesDialog(Adw.PreferencesDialog):
         toolbar.add_top_bar(Adw.HeaderBar())
         page.set_child(toolbar)
         self.push_subpage(page)
-
-    # Applying ----------------------------------------------------------------
 
     def _apply(self):
         """Save valid changes once, when the window closes, so the library reloads only once."""

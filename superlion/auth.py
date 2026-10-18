@@ -58,11 +58,7 @@ def run_async(func, callback):
 
 
 def steamid64(config):
-    """The SteamID64 of the account chosen in setup."""
     return str(config.account_id + STEAMID64_BASE)
-
-
-# Keyring -----------------------------------------------------------------
 
 
 def load_key():
@@ -92,9 +88,6 @@ def remove_legacy_sign_in():
         return bool(Secret.password_clear_sync(LEGACY_SCHEMA, LEGACY_ATTRIBUTES, None))
     except GLib.Error:
         return False
-
-
-# Web API -------------------------------------------------------------------
 
 
 def _get(interface, method, version, key, params):

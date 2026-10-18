@@ -2,10 +2,9 @@
 
 from gi.repository import Adw, Gio, GLib, Gtk
 
-from .. import auth, downloads, launch_presets, library, mod_managers, owned, pending, steam_control, steam_settings, store_api
+from .. import auth, downloads, library, mod_managers, owned, pending, steam_control, steam_settings, store_api
 from . import images
-from .launch_builder import LaunchOptionsBuilder
-from .launch_presets_dialog import LaunchPresetsDialog, save_as_preset
+from .launch_options_editor import LaunchOptionsEditor
 from .library_view import collections_popover
 from .downloads_view import describe
 from .media import MediaCarousel, description_widgets, news_group
@@ -28,7 +27,6 @@ def info_row(title, value):
 
 
 def folder_row(title, path, on_open):
-    """An information row for a folder, with a button that opens it."""
     row = info_row(title, str(path))
     button = Gtk.Button(icon_name="folder-open-symbolic", tooltip_text="Open Folder", valign=Gtk.Align.CENTER)
     button.add_css_class("flat")
@@ -57,8 +55,6 @@ class GameDetailsPage(Adw.NavigationPage):
         body.append(self._build_actions())
         body.append(self._build_download_progress())
 
-        # Overview: store media, description and developer updates, loaded from
-        # the network and inserted when they arrive.
         overview = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=24)
         self.store_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=24)
         self.news_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -183,8 +179,6 @@ class GameDetailsPage(Adw.NavigationPage):
             else:
                 self.header.remove_css_class(css)
 
-    # Download state ------------------------------------------------------------
-
     def _build_download_progress(self):
         """Progress of a Steam update or install, shown below Play while there is one."""
         self.download_area = Gtk.Box(
@@ -234,7 +228,6 @@ class GameDetailsPage(Adw.NavigationPage):
         self.primary.set_tooltip_text("Steam is handling this; see the Downloads tab for details")
 
     def release(self):
-        """Disconnect from the game once the page is popped; pages are not reused."""
         if getattr(self, "_download_timer", 0):
             GLib.source_remove(self._download_timer)
             self._download_timer = 0
@@ -243,8 +236,6 @@ class GameDetailsPage(Adw.NavigationPage):
         self._handlers = []
         if self.media:
             self.media.stop()
-
-    # Artwork ---------------------------------------------------------------
 
     ART_HINTS = {
         "cover": "Portrait, 600 × 900",
@@ -307,7 +298,6 @@ class GameDetailsPage(Adw.NavigationPage):
         return group
 
     def refresh_artwork(self, kind):
-        """Called by the window after artwork changes elsewhere, such as in the picker."""
         if kind in getattr(self, "art_rows", {}):
             self._refresh_art_row(kind)
 
@@ -364,7 +354,6 @@ class GameDetailsPage(Adw.NavigationPage):
         self._refresh_art_row(kind)
 
     def _build_actions(self):
-        # Wraps onto a second line in narrow windows.
         box = Adw.WrapBox(child_spacing=12, line_spacing=12, halign=Gtk.Align.CENTER, align=0.5)
         self.actions_box = box
         self._fill_actions()
@@ -388,13 +377,11 @@ class GameDetailsPage(Adw.NavigationPage):
         self.primary_label = primary.get_label()
         manager = mod_managers.linked(game.props.appid)
         if manager is not None:
-            # Kept out of the menu, as it is used as often as Play.
             box.append(self._pill(
                 "superlion-mod-manager-symbolic", "Launch Mod Manager", lambda: self.window.launch_mod_manager(manager),
                 tooltip=f"Open {manager.name}",
             ))
 
-        # Less frequent actions share one menu, so the row stays a single line.
         items = []
         if game.props.store_appid:
             items.append(("superlion-store-symbolic", "View in Store",
@@ -486,8 +473,6 @@ class GameDetailsPage(Adw.NavigationPage):
         group.add(info_row("App ID", str(game.props.appid)))
         return group
 
-    # Settings --------------------------------------------------------------
-
     def _build_settings(self):
         appid = self.game.props.appid
         config = self.window.config
@@ -511,24 +496,12 @@ class GameDetailsPage(Adw.NavigationPage):
         self.settings_group = Adw.PreferencesGroup(title="Steam Settings")
         self._update_settings_description()
 
-        self.options_row = Adw.EntryRow(title="Launch Options")
-        self.options_row.set_text(self.loaded["launch_options"])
-        self.options_row.connect("changed", self._on_settings_edited)
-        build_button = Gtk.Button(
-            icon_name="emblem-system-symbolic", tooltip_text="Build Launch Options", valign=Gtk.Align.CENTER
-        )
-        build_button.add_css_class("flat")
-        build_button.connect("clicked", lambda *_: self._build_options())
-        self.options_row.add_suffix(build_button)
-        presets_button = Gtk.MenuButton(
-            icon_name="view-list-bullet-symbolic", tooltip_text="Presets", valign=Gtk.Align.CENTER
-        )
-        presets_button.add_css_class("flat")
-        # Built when opened, so it always lists the current presets.
-        presets_button.set_create_popup_func(lambda b: b.set_menu_model(self._presets_menu()))
-        self.options_row.add_suffix(presets_button)
+        self.launch_options = self.loaded["launch_options"]
+        self.options_row = Adw.ActionRow(title="Launch Options", activatable=True, subtitle_lines=3)
+        self.options_row.add_suffix(Gtk.Image(icon_name="go-next-symbolic"))
+        self.options_row.connect("activated", lambda *_: self._edit_launch_options())
         self.settings_group.add(self.options_row)
-        self._build_preset_actions()
+        self._show_launch_options()
 
         self.tool_row = Adw.ComboRow(
             title="Compatibility Tool",
@@ -545,59 +518,20 @@ class GameDetailsPage(Adw.NavigationPage):
         self.settings_group.add(self.apply_row)
         return self.settings_group
 
-    def _build_preset_actions(self):
-        actions = Gio.SimpleActionGroup()
-        apply = Gio.SimpleAction.new("apply", GLib.VariantType.new("s"))
-        apply.connect("activate", lambda _a, value: self._apply_preset(value.get_string()))
-        actions.add_action(apply)
-        for name, callback in [
-            ("build", self._build_options), ("save", self._save_preset), ("manage", self._manage_presets),
-        ]:
-            action = Gio.SimpleAction.new(name, None)
-            action.connect("activate", lambda *_, cb=callback: cb())
-            actions.add_action(action)
-        self.options_row.insert_action_group("presets", actions)
-        self.preset_actions = actions
+    def _show_launch_options(self):
+        text = self.launch_options or "None. Choose to build them, or to use a preset."
+        self.options_row.set_subtitle(GLib.markup_escape_text(text))
 
-    def _presets_menu(self):
-        options = self.options_row.get_text().strip()
-        self.preset_actions.lookup_action("save").set_enabled(
-            bool(options) and launch_presets.find_by_options(options) is None
-        )
-        menu = Gio.Menu()
-        presets = Gio.Menu()
-        for preset in launch_presets.all_presets():
-            presets.append(preset.name, f"presets.apply::{preset.id}")
-        if presets.get_n_items():
-            menu.append_section("Use Preset", presets)
-        section = Gio.Menu()
-        section.append("Build Launch Options…", "presets.build")
-        section.append("Save as Preset…", "presets.save")
-        section.append("Manage Presets…", "presets.manage")
-        menu.append_section(None, section)
-        return menu
+    def _edit_launch_options(self):
+        editor = LaunchOptionsEditor(self.window, self.launch_options, game_name=self.game.props.name)
+        editor.connect("done", self._on_launch_options_chosen)
+        editor.present(self.window)
 
-    def _apply_preset(self, preset_id):
-        preset = launch_presets.get(preset_id)
-        if preset:
-            # Filled in only; Apply saves it to Steam as with any other edit.
-            self.options_row.set_text(preset.options)
-            self.window.toast(f"“{preset.name}” filled in. Press Apply to save it.")
-
-    def _build_options(self):
-        builder = LaunchOptionsBuilder(self.window, self.options_row.get_text(), self.game.props.name)
-        # Filled in only; Apply saves it to Steam as with any other edit.
-        builder.connect("chosen", lambda _b, options: self.options_row.set_text(options))
-        builder.present(self.window)
-
-    def _save_preset(self):
-        save_as_preset(
-            self.window, self.options_row.get_text(), self.game.props.name,
-            lambda preset: self.window.toast(f"Saved as “{preset.name}”"),
-        )
-
-    def _manage_presets(self):
-        LaunchPresetsDialog(self.window).present(self.window)
+    def _on_launch_options_chosen(self, _editor, options):
+        # Shown here only; Apply saves it to Steam with any other change.
+        self.launch_options = options
+        self._show_launch_options()
+        self._on_settings_edited()
 
     def _update_settings_description(self):
         if pending.get(self.game.props.appid):
@@ -608,7 +542,7 @@ class GameDetailsPage(Adw.NavigationPage):
 
     def _current_settings(self):
         return {
-            "launch_options": self.options_row.get_text().strip(),
+            "launch_options": self.launch_options.strip(),
             "compat_tool": self.tools[self.tool_row.get_selected()].name,
         }
 
@@ -670,8 +604,6 @@ class GameDetailsPage(Adw.NavigationPage):
         self.apply_row.set_sensitive(False)
         self._update_settings_description()
 
-    # Actions ---------------------------------------------------------------
-
     def _on_play(self, _button):
         self._open(self.game.run_uri, f"Launching {self.game.props.name}")
 
@@ -713,7 +645,6 @@ class GameDetailsPage(Adw.NavigationPage):
             icon_name="list-add-symbolic", tooltip_text="Add to Collection", valign=Gtk.Align.CENTER
         )
         button.add_css_class("flat")
-        # Built when opened, so it always reflects the current collections.
         button.set_create_popup_func(
             lambda b: b.set_popover(collections_popover(self.window, self.game))
         )
@@ -729,8 +660,6 @@ class GameDetailsPage(Adw.NavigationPage):
     def _open_folder(self, path):
         launcher = Gtk.FileLauncher(file=Gio.File.new_for_path(str(path)))
         launcher.launch(self.window, None, None)
-
-    # Store content -----------------------------------------------------------
 
     def _load_store_content(self):
         appid = self.game.props.store_appid

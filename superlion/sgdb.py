@@ -40,9 +40,6 @@ class ApiKeyError(Exception):
     """The API key is missing or was rejected."""
 
 
-# API key -------------------------------------------------------------------
-
-
 def load_key():
     try:
         return Secret.password_lookup_sync(SCHEMA, ATTRIBUTES, None) or ""
@@ -61,9 +58,6 @@ def clear_key():
         Secret.password_clear_sync(SCHEMA, ATTRIBUTES, None)
     except GLib.Error:
         pass
-
-
-# Requests ------------------------------------------------------------------
 
 
 def _get(path, key, params=None):
@@ -97,7 +91,6 @@ def images(kind, key, game_id=None, steam_appid=None, page=0):
 
 
 def download(url):
-    """Save a full-size image in the cache and return its path."""
     suffix = ".png" if url.lower().split("?")[0].endswith(".png") else ".jpg"
     target = config_mod.cache_dir() / "steamgriddb" / (hashlib.sha1(url.encode()).hexdigest() + suffix)
     if not target.is_file():

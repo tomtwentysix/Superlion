@@ -71,7 +71,6 @@ class Capsule(Gtk.Button):
 
 
 class StoreView(Gtk.Box):
-    """The Store section of the main window."""
 
     def __init__(self, window):
         super().__init__(orientation=Gtk.Orientation.VERTICAL)
@@ -190,7 +189,6 @@ class StoreView(Gtk.Box):
 
 
 class StoreAppPage(Adw.NavigationPage):
-    """A game's store page, built from the public store details."""
 
     def __init__(self, window, appid, name=""):
         super().__init__(title=name or "Store")
@@ -251,7 +249,6 @@ class StoreAppPage(Adw.NavigationPage):
         auth.run_async(load, done)
 
     def release(self):
-        """Called by the window when this page is closed."""
         if self.media:
             self.media.stop()
 

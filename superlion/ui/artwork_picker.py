@@ -57,8 +57,6 @@ class ArtworkPicker(Adw.Dialog):
         else:
             self.stack.set_visible_child_name("key")
 
-    # Pages -----------------------------------------------------------------
-
     def _build_key_page(self):
         setup = SgdbKeySetup(self.window)
         setup.connect("saved", lambda *_: (setattr(self, "key", sgdb.load_key()), self._start()))
@@ -101,8 +99,6 @@ class ArtworkPicker(Adw.Dialog):
         self.message.set_description(description)
         self.message.set_icon_name(icon)
         self.stack.set_visible_child_name("message")
-
-    # Loading ---------------------------------------------------------------
 
     def _start(self):
         if self.game.props.non_steam:

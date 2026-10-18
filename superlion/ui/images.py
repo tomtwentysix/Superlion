@@ -15,7 +15,6 @@ _waiting = {}
 
 
 def _local_copy(url):
-    """Download a remote image once and keep it in the cache folder."""
     suffix = Path(url.split("?", 1)[0]).suffix or ".img"
     target = config_mod.cache_dir() / "images" / (hashlib.sha1(url.encode()).hexdigest() + suffix)
     if not target.is_file():
@@ -72,7 +71,6 @@ def load(path, width, height, callback):
 
 
 def forget(path):
-    """Drop cached textures for a file whose contents have changed."""
     for key in [k for k in _cache if k[0] == path]:
         del _cache[key]
 

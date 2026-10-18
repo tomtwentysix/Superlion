@@ -4,7 +4,7 @@ Steam launch options take the form
 
     VARIABLE=value … wrapper programs … %command% game arguments …
 
-Each part becomes a setting that the launch options builder can switch on and
+Each part becomes a setting that the launch options editor can switch on and
 off. Anything not recognised is kept as written, so nothing is lost.
 """
 
@@ -25,7 +25,7 @@ WRAPPERS = ["prime-run", "gamemoderun", "obs-gamecapture", "mangohud", "gamescop
 
 ENV, WRAPPER, ARGUMENT = "env", "wrapper", "argument"
 
-# Categories, in the order the builder shows them.
+# Categories, in the order the editor shows them.
 CATEGORIES = [
     "Tools",
     "Display and HDR",
@@ -141,9 +141,6 @@ CATALOGUE = {
 }
 
 
-# Settings the user adds ------------------------------------------------------
-
-
 @dataclass
 class Custom:
     kind: str
@@ -159,7 +156,7 @@ def _custom_path():
 
 
 def custom_settings():
-    """Settings the user added to the builder, keyed by (kind, key)."""
+    """Settings the user added to the editor, keyed by (kind, key)."""
     try:
         data = json.loads(_custom_path().read_text())
     except (OSError, ValueError):
@@ -201,9 +198,6 @@ def is_valid_key(kind, key):
     if kind == WRAPPER:
         return bool(key) and not any(c.isspace() for c in key) and key not in (COMMAND, "--", "env")
     return bool(key.strip()) and COMMAND not in key
-
-
-# Splitting and joining -------------------------------------------------------
 
 
 def tokenize(options):
@@ -311,9 +305,6 @@ def compose(env, wrappers, other, arguments):
     return "" if options == COMMAND else options
 
 
-# Settings from the user's games -------------------------------------------------
-
-
 @dataclass
 class Setting:
     kind: str  # ENV, WRAPPER or ARGUMENT
@@ -324,7 +315,7 @@ class Setting:
     values: Counter  # Values used across the user's games, by number of games
     games: int  # Number of games using it
     default: str = "1"  # Value used when none of the user's games has one
-    custom: bool = False  # Added to the builder by the user
+    custom: bool = False  # Added to the editor by the user
 
     @property
     def takes_value(self):

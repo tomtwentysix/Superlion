@@ -1,4 +1,4 @@
-"""Adding a setting to the launch options builder: a suggestion, or one of the user's own."""
+"""Adding a setting to the launch options editor: a suggestion, or one of the user's own."""
 
 from gi.repository import Adw, GLib, GObject, Gtk
 
@@ -16,9 +16,10 @@ class AddLaunchSettingDialog(Adw.Dialog):
 
     __gsignals__ = {"added": (GObject.SignalFlags.RUN_FIRST, None, (object,))}
 
-    def __init__(self, present):
+    def __init__(self, present, for_game=True):
         super().__init__(title="Add Setting", content_width=600, content_height=720)
         self.present_keys = set(present)
+        self.for_game = for_game
         self.add_button = Gtk.Button(label="Add", sensitive=False)
         self.add_button.add_css_class("suggested-action")
         self.add_button.connect("clicked", lambda *_: self._add_custom())
@@ -39,12 +40,12 @@ class AddLaunchSettingDialog(Adw.Dialog):
         self.set_child(toolbar)
         self.set_focus(self.key_row)
 
-    # Your own --------------------------------------------------------------
-
     def _build_custom(self):
         group = Adw.PreferencesGroup(
             title="Your Own Setting",
-            description="It is added to the builder for every game, and switched on for this one.",
+            description=(
+                "It is offered for every game" + (", and switched on for this one." if self.for_game else ".")
+            ),
         )
         self.kind_row = Adw.ComboRow(title="Type", model=Gtk.StringList.new([k[1] for k in KINDS]))
         self.key_row = Adw.EntryRow()
@@ -92,7 +93,7 @@ class AddLaunchSettingDialog(Adw.Dialog):
                 lo.ARGUMENT: "An argument cannot contain %command%.",
             }[self.kind]
         elif (self.kind, key) in self.present_keys:
-            error = "This setting is already in the builder."
+            error = "This setting is already offered."
         self.status.set_label(error)
         self.status.set_visible(bool(error))
         self.add_button.set_sensitive(bool(key) and not error)
@@ -111,15 +112,13 @@ class AddLaunchSettingDialog(Adw.Dialog):
         )
         self._finish(custom)
 
-    # Suggestions -----------------------------------------------------------
-
     def _build_suggestions(self):
         settings = lo.suggestions(self.present_keys)
         if not settings:
             return None
         group = Adw.PreferencesGroup(
             title="Suggestions",
-            description="Settings Superlion knows that are not in the builder yet.",
+            description="Settings Superlion knows that are not offered yet.",
         )
         settings.sort(key=lambda s: (lo.CATEGORIES.index(s.category), s.title.casefold()))
         for setting in settings:

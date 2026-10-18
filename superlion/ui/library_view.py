@@ -19,11 +19,7 @@ BUILT_IN_VIEWS = [
 MANAGER_FREE_VIEWS = {"all", "installed", "not_installed", "non_steam"}
 
 
-# Tiles ---------------------------------------------------------------------
-
-
 class LibraryTile(Gtk.Box):
-    """A game cover with its name; uninstalled games get an Install button."""
 
     def __init__(self, window):
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=6)
@@ -51,7 +47,6 @@ class LibraryTile(Gtk.Box):
         self.install_button.connect("clicked", self._on_install)
         overlay.add_overlay(self.install_button)
 
-        # Steam download state, such as "Updating 42%", along the bottom of the cover.
         self.download_box = Gtk.Box(
             orientation=Gtk.Orientation.VERTICAL, spacing=6, valign=Gtk.Align.END,
             margin_start=8, margin_end=8, margin_bottom=8, visible=False,
@@ -69,7 +64,6 @@ class LibraryTile(Gtk.Box):
         self.label = Gtk.Label(ellipsize=Pango.EllipsizeMode.END, max_width_chars=1, hexpand=True)
         self.append(self.label)
 
-        # Right-click, or press and hold on a touch screen, to manage collections.
         click = Gtk.GestureClick(button=3)
         click.connect("pressed", lambda *_: self._show_menu())
         self.add_controller(click)
@@ -238,7 +232,6 @@ def game_menu(window, game):
 
 
 def collections_popover(window, game):
-    """Check boxes for adding a game to, or removing it from, the user's collections."""
     popover = Gtk.Popover()
     box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6, margin_top=6, margin_bottom=6,
                   margin_start=6, margin_end=6)
@@ -262,9 +255,6 @@ def collections_popover(window, game):
     box.append(new)
     popover.set_child(box)
     return popover
-
-
-# Sidebar -------------------------------------------------------------------
 
 
 class SidebarRow(Gtk.ListBoxRow):
@@ -306,12 +296,9 @@ class LibraryView(Adw.Bin):
             model=Gtk.FilterListModel(model=self.store, filter=self.filter), sorter=self.sorter
         )
 
-        # The window places the sidebar in its split view, beside all page content.
         self.sidebar = self._build_sidebar()
         self.set_child(self._build_content())
         self.split = None
-
-    # Sidebar ---------------------------------------------------------------
 
     def _build_sidebar(self):
         self.sidebar_list = Gtk.ListBox(selection_mode=Gtk.SelectionMode.SINGLE)
@@ -330,7 +317,6 @@ class LibraryView(Adw.Bin):
         toolbar = Adw.ToolbarView(
             content=Gtk.ScrolledWindow(child=self.sidebar_list, hscrollbar_policy=Gtk.PolicyType.NEVER)
         )
-        # Split header bars: the sidebar has its own, so it runs the full window height.
         toolbar.add_top_bar(Adw.HeaderBar(show_title=False))
         toolbar.add_bottom_bar(self.sync_button)
         return toolbar
@@ -349,7 +335,6 @@ class LibraryView(Adw.Bin):
             row.set_header(None)
 
     def refresh_sidebar(self):
-        """Rebuild the sidebar from the current sign-in state and collections."""
         steam = game_collections.load_steam(self.window.config) if self.window.config else []
         own = game_collections.load_own()
         self.collections = {c.id: c for c in steam + own}
@@ -436,8 +421,6 @@ class LibraryView(Adw.Bin):
         popover.connect("closed", lambda p: GLib.idle_add(p.unparent))
         popover.popup()
 
-    # Content ---------------------------------------------------------------
-
     def _build_content(self):
         self.search_entry = Gtk.SearchEntry(placeholder_text="Search games", hexpand=True)
         self.search_entry.connect("search-changed", self._on_search_changed)
@@ -482,7 +465,6 @@ class LibraryView(Adw.Bin):
         return box
 
     def _show_mod_managers(self):
-        """List of mod managers, with launch and remove buttons and a way to add apps."""
         for old in self._manager_groups:
             self.managers_page.remove(old)
         group = Adw.PreferencesGroup(
@@ -569,7 +551,6 @@ class LibraryView(Adw.Bin):
         self.changed()
 
     def changed(self):
-        """Re-apply the view, search, sort and grouping."""
         self.filter.changed(Gtk.FilterChange.DIFFERENT)
         self.sorter.changed(Gtk.SorterChange.DIFFERENT)
         if self.group_mode != "none" and not self._rebuild_source:

@@ -34,7 +34,6 @@ def is_steam_host(host):
 
 
 def clear_sign_in(callback=None):
-    """Sign the embedded browser out of the Steam website by removing its cookies."""
     manager = network_session().get_website_data_manager()
     manager.clear(
         WebKit.WebsiteDataTypes.COOKIES,
@@ -86,10 +85,7 @@ class SteamWebPage(Adw.NavigationPage):
         self._load_signed_in(url)
 
     def _load_signed_in(self, url):
-        # Any sign-in is the user's own, made on Steam's pages in this browser session.
         self.webview.load_uri(url)
-
-    # Navigation --------------------------------------------------------------
 
     def _on_decide_policy(self, _view, decision, decision_type):
         if decision_type not in (
@@ -123,7 +119,6 @@ class SteamWebPage(Adw.NavigationPage):
             self.in_checkout = True
         elif is_steam_host(host):
             self.in_checkout = False
-        # The address is shown so it is always clear which site is open.
         self.window_title.set_subtitle(uri)
 
     def _on_title_changed(self, view, _pspec):

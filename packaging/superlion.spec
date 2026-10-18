@@ -1,5 +1,5 @@
 Name:           superlion
-Version:        0.6
+Version:        0.7
 Release:        1%{?dist}
 Summary:        Native GNOME front end for your Steam library
 License:        GPL-3.0-or-later
@@ -35,7 +35,6 @@ Dedicated to the memory of John Wharton of S J Wharton Ltd (1953-2026).
 %autosetup
 
 %build
-# Pure Python; nothing to build.
 
 %install
 install -d %{buildroot}%{_datadir}/%{name}
@@ -63,6 +62,9 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/uk.co.solarflareit.Su
 %{_datadir}/icons/hicolor/*/apps/uk.co.solarflareit.Superlion*
 
 %changelog
+* Sun Oct 18 2026 Tom <tom@solarflareit.co.uk> - 0.7-1
+- Bring launch options together: one editor for typing and switching settings, with presets, and a Launch Options tab in Preferences.
+
 * Sun Oct 18 2026 Tom <tom@solarflareit.co.uk> - 0.6-1
 - Let settings be added to the launch options builder: suggestions Superlion knows, or the user's own variables, programs and game arguments.
 

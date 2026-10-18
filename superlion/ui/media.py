@@ -117,7 +117,6 @@ class TrailerTile(Gtk.Overlay):
             self.play()
 
     def stop(self):
-        """Release the stream and show the thumbnail again."""
         if self.pipeline is not None:
             self.pipeline.set_state(Gst.State.NULL)
             self.pipeline.get_bus().remove_signal_watch()
@@ -151,7 +150,6 @@ Gst = None
 
 
 class MediaCarousel(Gtk.Box):
-    """Trailers followed by screenshots, with arrows and page dots."""
 
     def __init__(self, data):
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=12)
@@ -198,7 +196,6 @@ class MediaCarousel(Gtk.Box):
             tile.pause()
 
     def stop(self):
-        """Close every trailer stream; used when the page is closed."""
         for tile in self.trailers:
             tile.stop()
 
