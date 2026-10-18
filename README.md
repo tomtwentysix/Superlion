@@ -35,7 +35,8 @@ Superlion is dedicated to the memory of John Wharton of S J Wharton Ltd (1953–
 ### Launch options builder
 - Build a game's launch options by switching settings on and off instead of typing them. The settings offered are gathered from the launch options of all your games, plus GameMode, MangoHud, Gamescope and Proton's log, grouped as Tools, Display and HDR, NVIDIA and DLSS, Proton and Wine, Audio, VR, other variables and game arguments.
 - Each setting says what it does, where Superlion knows, and how many of your games use it. Settings with a value, such as DLL overrides or Gamescope's options, can be edited, and offer the values your games already use.
-- Anything else can be typed in **Your Own**. Settings the game already has keep their order, and nothing unrecognised is dropped.
+- **Add Setting** (the + button) adds a setting to the builder for every game: one of Superlion's suggestions, such as Disable Fsync, DXVK Frame Rate Limit or the CachyOS performance profile, or your own environment variable, program or game argument, with an optional display name, group and description. Settings you added have a remove button.
+- Anything else can be typed once in **Your Own**. Settings the game already has keep their order, and nothing unrecognised is dropped.
 
 ### Launch option presets
 - Save launch options you use often, such as `gamemoderun mangohud %command%`, as named presets, and fill them into any game's launch options from its Steam Settings.
@@ -67,7 +68,7 @@ packaging/build-rpm.sh
 ```
 
 ```bash
-sudo dnf install ./dist/superlion-0.5-1.fc44.noarch.rpm
+sudo dnf install ./dist/superlion-0.6-1.fc44.noarch.rpm
 ```
 
 This installs the `superlion` command, the app grid launcher and the icons. Store trailers need an H.264 decoder; `dnf` installs one if it is available from your enabled repositories (`gstreamer1-plugin-libav` or `gstreamer1-plugin-openh264`).
@@ -154,5 +155,6 @@ Some things Superlion relies on are not documented by Valve and may change: the 
 | `~/.config/superlion/steam_matches.json` | Store matches you chose for non-Steam games |
 | `~/.config/superlion/mod_managers.json` | Mod managers and the games linked to them |
 | `~/.config/superlion/launch_presets.json` | Launch option presets |
+| `~/.config/superlion/launch_settings.json` | Settings you added to the launch options builder |
 | `~/.local/share/superlion/` | Changes waiting for Steam to close, and the store's cookies |
 | `~/.cache/superlion/` | Owned-games list, Steam's app data, store data, downloaded artwork, automatic store matches and your account's country |

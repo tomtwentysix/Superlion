@@ -8,9 +8,13 @@ Each part becomes a setting that the launch options builder can switch on and
 off. Anything not recognised is kept as written, so nothing is lost.
 """
 
+import json
+import os
 import re
 from collections import Counter
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
+
+from . import config as config_mod
 
 COMMAND = "%command%"
 VARIABLE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)=(.*)$", re.S)
@@ -99,6 +103,34 @@ CATALOGUE = {
     (ENV, "PROTON_USE_WOW64"): Known("WoW64 Mode", "Proton and Wine", "Runs 32-bit Windows code with Wine's newer WoW64 mode."),
     (ENV, "PROTON_USE_EAC_LINUX"): Known("Easy Anti-Cheat for Linux", "Proton and Wine", "Uses the Linux Easy Anti-Cheat runtime."),
     (ENV, "PROTON_LOG"): Known("Proton Log", "Proton and Wine", "Writes a log to steam-<app ID>.log in your home folder."),
+    (ENV, "PROTON_NO_ESYNC"): Known(
+        "Disable Esync", "Proton and Wine", "Turns off eventfd synchronisation, which fixes some games."
+    ),
+    (ENV, "PROTON_NO_FSYNC"): Known(
+        "Disable Fsync", "Proton and Wine", "Turns off futex synchronisation, which fixes some games."
+    ),
+    (ENV, "PROTON_FORCE_LARGE_ADDRESS_AWARE"): Known(
+        "Large Address Aware", "Proton and Wine", "Lets 32-bit games use up to 4 GB of memory."
+    ),
+    (ENV, "PROTON_HIDE_NVIDIA_GPU"): Known(
+        "Hide NVIDIA Graphics Card", "NVIDIA and DLSS", "Reports the graphics card as AMD, for games that misbehave on NVIDIA."
+    ),
+    (ENV, "DXVK_HUD"): Known(
+        "DXVK Overlay", "Display and HDR", "Shows DXVK's overlay; fps shows the frame rate.", "fps"
+    ),
+    (ENV, "DXVK_FRAME_RATE"): Known(
+        "DXVK Frame Rate Limit", "Display and HDR", "Limits the frame rate of DirectX games running through DXVK.", "60"
+    ),
+    (ENV, "MANGOHUD"): Known(
+        "MangoHud in Vulkan Games", "Display and HDR", "1 shows MangoHud in Vulkan games without the mangohud command."
+    ),
+    (ENV, "MANGOHUD_CONFIG"): Known(
+        "MangoHud Settings", "Display and HDR", "MangoHud settings separated by commas.", "fps_limit=60"
+    ),
+    (ENV, "SteamDeck"): Known("Steam Deck Mode", "Other Variables", "Makes some games use their Steam Deck settings."),
+    (WRAPPER, "game-performance"): Known(
+        "Performance Power Profile", "Tools", "Switches to the performance power profile while the game runs (CachyOS).", ""
+    ),
     (ENV, "PULSE_SINK"): Known("Audio Output", "Audio", "Sends the game's sound to this audio output.", ""),
     (ENV, "PRESSURE_VESSEL_IMPORT_OPENXR_1_RUNTIMES"): Known(
         "OpenXR Runtime", "VR", "Makes your OpenXR runtime, such as WiVRn, available inside Steam's container."
@@ -107,6 +139,68 @@ CATALOGUE = {
         "Container Folders", "VR", "Folders Steam's container may write to, such as your VR runtime's.", ""
     ),
 }
+
+
+# Settings the user adds ------------------------------------------------------
+
+
+@dataclass
+class Custom:
+    kind: str
+    key: str
+    title: str
+    category: str
+    description: str = ""
+    default: str = "1"
+
+
+def _custom_path():
+    return config_mod.config_dir() / "launch_settings.json"
+
+
+def custom_settings():
+    """Settings the user added to the builder, keyed by (kind, key)."""
+    try:
+        data = json.loads(_custom_path().read_text())
+    except (OSError, ValueError):
+        return {}
+    result = {}
+    for item in data.get("settings", []):
+        try:
+            custom = Custom(**item)
+        except TypeError:
+            continue
+        result[(custom.kind, custom.key)] = custom
+    return result
+
+
+def _save_custom(settings):
+    path = _custom_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps({"settings": [asdict(c) for c in settings.values()]}, indent=2))
+    os.replace(tmp, path)
+
+
+def add_custom(custom):
+    settings = custom_settings()
+    settings[(custom.kind, custom.key)] = custom
+    _save_custom(settings)
+
+
+def remove_custom(kind, key):
+    settings = custom_settings()
+    settings.pop((kind, key), None)
+    _save_custom(settings)
+
+
+def is_valid_key(kind, key):
+    """Whether a name can be used for a setting of this kind."""
+    if kind == ENV:
+        return bool(re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key))
+    if kind == WRAPPER:
+        return bool(key) and not any(c.isspace() for c in key) and key not in (COMMAND, "--", "env")
+    return bool(key.strip()) and COMMAND not in key
 
 
 # Splitting and joining -------------------------------------------------------
@@ -142,7 +236,8 @@ class Parsed:
     arguments: list = field(default_factory=list)  # Game arguments, each with its values
 
 
-def parse(options):
+def parse(options, programs=()):
+    """Split launch options; programs are extra wrapper programs to recognise."""
     words = tokenize(options)
     parsed = Parsed()
     if COMMAND not in words:
@@ -165,6 +260,16 @@ def parse(options):
             i = end
         elif name in WRAPPERS:
             parsed.wrappers[name] = ""
+        elif name in programs:
+            # Its options are the words up to the next variable or program.
+            end = i + 1
+            while end < len(before) and not (
+                VARIABLE.match(before[end]) or before[end] in ("--", "env")
+                or before[end].rsplit("/", 1)[-1] in (*WRAPPERS, *programs)
+            ):
+                end += 1
+            parsed.wrappers[name] = " ".join(before[i + 1:end])
+            i = end - 1
         elif word != "env":  # "env" only sets the variables that follow it.
             parsed.other.append(word)
         i += 1
@@ -193,12 +298,12 @@ def quote(value):
 def compose(env, wrappers, other, arguments):
     """Launch options from settings: env [(name, value)], wrappers {program: options}."""
     words = [f"{name}={quote(value)}" for name, value in env]
-    for program in WRAPPERS:
-        if program in wrappers:
-            if program == "gamescope":
-                words += ["gamescope", wrappers[program], "--"] if wrappers[program] else ["gamescope", "--"]
-            else:
-                words += [program, wrappers[program]] if wrappers[program] else [program]
+    # Known programs first, then the user's own, which run closest to the game.
+    for program in [p for p in WRAPPERS if p in wrappers] + [p for p in wrappers if p not in WRAPPERS]:
+        if program == "gamescope":
+            words += ["gamescope", wrappers[program], "--"]
+        else:
+            words += [program, wrappers[program]]
     words += other
     words.append(COMMAND)
     words += arguments
@@ -218,29 +323,43 @@ class Setting:
     description: str
     values: Counter  # Values used across the user's games, by number of games
     games: int  # Number of games using it
+    default: str = "1"  # Value used when none of the user's games has one
+    custom: bool = False  # Added to the builder by the user
 
     @property
     def takes_value(self):
         if self.kind == ARGUMENT:
             return False
         if self.kind == WRAPPER:
-            return self.key == "gamescope"
+            return self.key == "gamescope" or bool(self.default) or any(self.values)
         return (set(self.values) or {self.common_value}) != {"1"}
 
     @property
     def common_value(self):
         if self.values:
             return self.values.most_common(1)[0][0]
-        known = CATALOGUE.get((self.kind, self.key))
-        return known.default if known else "1"
+        return self.default
 
 
-def setting_for(kind, key):
-    known = CATALOGUE.get((kind, key))
+def default_category(kind):
+    return "Game Arguments" if kind == ARGUMENT else "Tools" if kind == WRAPPER else "Other Variables"
+
+
+def setting_for(kind, key, custom=None):
+    custom = custom if custom is not None else custom_settings()
+    known = custom.get((kind, key)) or CATALOGUE.get((kind, key))
+    default = "" if kind == WRAPPER else "1"
     if known:
-        return Setting(kind, key, known.title, known.category, known.description, Counter(), 0)
-    category = "Game Arguments" if kind == ARGUMENT else "Tools" if kind == WRAPPER else "Other Variables"
-    return Setting(kind, key, key, category, "", Counter(), 0)
+        return Setting(
+            kind, key, known.title, known.category, known.description, Counter(), 0,
+            known.default, (kind, key) in custom,
+        )
+    return Setting(kind, key, key, default_category(kind), "", Counter(), 0, default)
+
+
+def suggestions(present):
+    """Settings Superlion knows that are not among the present (kind, key) pairs."""
+    return [setting_for(kind, key, {}) for kind, key in CATALOGUE if (kind, key) not in present]
 
 
 # Shown even when none of the user's games use them yet.
@@ -248,27 +367,35 @@ ALWAYS_OFFERED = [(WRAPPER, "gamemoderun"), (WRAPPER, "mangohud"), (WRAPPER, "ga
 
 
 def baseline(all_options):
-    """Every setting used in the given launch options, plus a few common ones.
+    """Every setting used in the given launch options, plus common and user-added ones.
 
     Returns {(kind, key): Setting}, counting how many games use each setting and
     which values they use.
     """
     settings = {}
+    custom = custom_settings()
+    programs = custom_programs(custom)
 
     def note(kind, key, value=None):
-        setting = settings.setdefault((kind, key), setting_for(kind, key))
+        setting = settings.setdefault((kind, key), setting_for(kind, key, custom))
         setting.games += 1
         if value is not None:
             setting.values[value] += 1
 
     for options in all_options:
-        parsed = parse(options)
+        parsed = parse(options, programs)
         for name, value in dict(parsed.env).items():
             note(ENV, name, value)
         for program, program_options in parsed.wrappers.items():
-            note(WRAPPER, program, program_options if program == "gamescope" else None)
+            note(WRAPPER, program, program_options if program_options or program == "gamescope" else None)
         for argument in dict.fromkeys(parsed.arguments):
             note(ARGUMENT, argument)
-    for kind, key in ALWAYS_OFFERED:
-        settings.setdefault((kind, key), setting_for(kind, key))
+    for kind, key in [*ALWAYS_OFFERED, *custom]:
+        settings.setdefault((kind, key), setting_for(kind, key, custom))
     return settings
+
+
+def custom_programs(custom=None):
+    """Names of programs the user added, for parse()."""
+    custom = custom if custom is not None else custom_settings()
+    return {key for kind, key in custom if kind == WRAPPER}
