@@ -4,6 +4,7 @@ from gi.repository import Adw, Gio, GLib, Gtk
 
 from .. import auth, downloads, launch_presets, library, mod_managers, owned, pending, steam_control, steam_settings, store_api
 from . import images
+from .launch_builder import LaunchOptionsBuilder
 from .launch_presets_dialog import LaunchPresetsDialog, save_as_preset
 from .library_view import collections_popover
 from .downloads_view import describe
@@ -513,6 +514,12 @@ class GameDetailsPage(Adw.NavigationPage):
         self.options_row = Adw.EntryRow(title="Launch Options")
         self.options_row.set_text(self.loaded["launch_options"])
         self.options_row.connect("changed", self._on_settings_edited)
+        build_button = Gtk.Button(
+            icon_name="emblem-system-symbolic", tooltip_text="Build Launch Options", valign=Gtk.Align.CENTER
+        )
+        build_button.add_css_class("flat")
+        build_button.connect("clicked", lambda *_: self._build_options())
+        self.options_row.add_suffix(build_button)
         presets_button = Gtk.MenuButton(
             icon_name="view-list-bullet-symbolic", tooltip_text="Presets", valign=Gtk.Align.CENTER
         )
@@ -543,7 +550,9 @@ class GameDetailsPage(Adw.NavigationPage):
         apply = Gio.SimpleAction.new("apply", GLib.VariantType.new("s"))
         apply.connect("activate", lambda _a, value: self._apply_preset(value.get_string()))
         actions.add_action(apply)
-        for name, callback in [("save", self._save_preset), ("manage", self._manage_presets)]:
+        for name, callback in [
+            ("build", self._build_options), ("save", self._save_preset), ("manage", self._manage_presets),
+        ]:
             action = Gio.SimpleAction.new(name, None)
             action.connect("activate", lambda *_, cb=callback: cb())
             actions.add_action(action)
@@ -562,6 +571,7 @@ class GameDetailsPage(Adw.NavigationPage):
         if presets.get_n_items():
             menu.append_section("Use Preset", presets)
         section = Gio.Menu()
+        section.append("Build Launch Options…", "presets.build")
         section.append("Save as Preset…", "presets.save")
         section.append("Manage Presets…", "presets.manage")
         menu.append_section(None, section)
@@ -573,6 +583,12 @@ class GameDetailsPage(Adw.NavigationPage):
             # Filled in only; Apply saves it to Steam as with any other edit.
             self.options_row.set_text(preset.options)
             self.window.toast(f"“{preset.name}” filled in. Press Apply to save it.")
+
+    def _build_options(self):
+        builder = LaunchOptionsBuilder(self.window, self.options_row.get_text(), self.game.props.name)
+        # Filled in only; Apply saves it to Steam as with any other edit.
+        builder.connect("chosen", lambda _b, options: self.options_row.set_text(options))
+        builder.present(self.window)
 
     def _save_preset(self):
         save_as_preset(
