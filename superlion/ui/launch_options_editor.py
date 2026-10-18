@@ -371,7 +371,7 @@ class LaunchOptionsEditor(Adw.Dialog):
             use.add_suffix(menu)
             use.set_activatable_widget(menu)
         group.add(use)
-        save = Adw.ButtonRow(title="Save as Preset…", start_icon_name="document-save-symbolic")
+        save = Adw.ButtonRow(title="Save as Preset…", start_icon_name="bookmark-new-symbolic")
         save.connect("activated", lambda *_: self._save_as_preset())
         group.add(save)
         return group
