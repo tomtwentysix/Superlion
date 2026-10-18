@@ -244,6 +244,8 @@ def sync_to_steam(config, include_own=True):
     it next starts. Collections deleted in Superlion are marked deleted in Steam.
     Both files are backed up first.
     """
+    if config_mod.SCREENSHOTS:
+        return
     store = _load_store()
     path, modified_path = _namespace_path(config), _modified_path(config)
     entries = json.loads(path.read_text())

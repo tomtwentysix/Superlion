@@ -10,6 +10,7 @@ from pathlib import Path
 
 from gi.repository import GObject
 
+from . import config as config_mod
 from . import vdf
 
 # Runtime and compatibility tools that Steam installs like games.
@@ -220,6 +221,8 @@ def set_custom_art(config, appid, kind, source):
     Steam reads PNG and JPEG files from userdata/<account>/config/grid, named by
     app ID and kind; any earlier custom image for the same kind is replaced.
     """
+    if config_mod.SCREENSHOTS:
+        return Path(source)
     source = Path(source)
     ext = "png" if source.suffix.lower() == ".png" else "jpg"
     clear_custom_art(config, appid, kind)
@@ -230,6 +233,8 @@ def set_custom_art(config, appid, kind, source):
 
 
 def clear_custom_art(config, appid, kind):
+    if config_mod.SCREENSHOTS:
+        return
     for path in _grid_files(config, appid, kind):
         path.unlink(missing_ok=True)
 

@@ -8,6 +8,7 @@ from pathlib import Path
 
 from gi.repository import Gio, GLib
 
+from . import config as config_mod
 from . import steam_paths
 
 SHUTDOWN_TIMEOUT = 60  # seconds
@@ -99,6 +100,9 @@ def relaunch(config, while_closed, callback):
     Steam is restarted even if while_closed() fails, so the user is not left
     without it.
     """
+    if config_mod.SCREENSHOTS:
+        callback(None)
+        return
 
     def closed(ok):
         if not ok:

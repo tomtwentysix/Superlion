@@ -34,7 +34,7 @@ headerbar.hero-header.end-light windowcontrols.end button { color: rgba(0, 0, 0,
 class SuperlionWindow(Adw.ApplicationWindow):
     def __init__(self, **kwargs):
         super().__init__(default_width=1100, default_height=760, title="Superlion", **kwargs)
-        if config_mod.DEVEL:
+        if config_mod.DEVEL and not config_mod.SCREENSHOTS:
             self.add_css_class("devel")
         self.config = None
         self.api_key = ""  # The user's Steam Web API key, when connected.

@@ -54,6 +54,8 @@ def collections_waiting():
 
 def count():
     """Waiting changes: each game setting counts once, and a collection sync counts once."""
+    if config_mod.SCREENSHOTS:
+        return 0
     queue = load()
     collections = 1 if queue.pop(COLLECTIONS_KEY, None) else 0
     return collections + sum(len(changes) for changes in queue.values())
@@ -61,6 +63,8 @@ def count():
 
 def apply_now(config):
     """Write every queued change and clear the queue. Steam must not be running."""
+    if config_mod.SCREENSHOTS:
+        return 0
     queue = load()
     applied = len(queue)
     sync = queue.pop(COLLECTIONS_KEY, None)
