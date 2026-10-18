@@ -71,19 +71,38 @@ def open_uri(config, uri):
     """
     if not is_running(config):
         if uri.startswith(BACKGROUND_LINKS):
-            _spawn(config, "-silent", uri)
+            _spawn(config, *start_options(config), uri)
         else:
-            _spawn(config, uri)
+            _spawn(config, *streaming_options(config), uri)
     elif len(steam_paths.command_candidates()) > 1:
         _spawn(config, uri)
     else:
         Gio.AppInfo.launch_default_for_uri(uri, None)
 
 
+# Ways Steam can capture the screen for Remote Play, best first.
+STREAM_CAPTURE = {
+    "-pipewire-dmabuf": "DMA-BUF",
+    "-pipewire": "Standard",
+}
+
+
+def streaming_options(config):
+    """Steam's options for Remote Play streaming, if the user streams from this computer."""
+    if not config.stream:
+        return []
+    return [config.stream_capture if config.stream_capture in STREAM_CAPTURE else "-pipewire-dmabuf"]
+
+
+def start_options(config):
+    """Options Superlion starts Steam with: hidden, and streaming if chosen."""
+    return ["-silent", *streaming_options(config)]
+
+
 def start(config):
     """Start Steam without showing its window."""
     if not config_mod.SCREENSHOTS:
-        _spawn(config, "-silent")
+        _spawn(config, *start_options(config))
 
 
 def start_if_needed(config):

@@ -5,7 +5,7 @@ from pathlib import Path
 
 from gi.repository import Adw, Gio, GObject, Gtk
 
-from .. import auth, sgdb, steam_paths
+from .. import auth, sgdb, steam_control, steam_paths
 from .sgdb_setup import SgdbKeySetup
 from .steam_key_setup import SteamKeySetup
 
@@ -330,6 +330,38 @@ def library_groups(add_group, state, get_parent):
     return collect
 
 
+STREAMING_DESCRIPTION = (
+    "For Steam Remote Play to a Steam Deck, Steam Link, phone or another computer. "
+    "Steam is started with PipeWire screen capture, which streaming needs on Wayland."
+)
+
+
+def streaming_rows(group, state):
+    """The streaming switch and capture method, kept in step with state."""
+    switch = Adw.SwitchRow(
+        title="I Stream Games From This PC", subtitle=STREAMING_DESCRIPTION, active=state.stream
+    )
+    values = list(steam_control.STREAM_CAPTURE)
+    labels = list(steam_control.STREAM_CAPTURE.values())
+    method = Adw.ComboRow(
+        title="Capture Method",
+        subtitle="Try the other if streaming shows a black screen",
+        model=Gtk.StringList.new(labels),
+        selected=values.index(state.stream_capture) if state.stream_capture in values else 0,
+        sensitive=state.stream,
+    )
+
+    def on_switch(row, _pspec):
+        state.stream = row.get_active()
+        method.set_sensitive(state.stream)
+
+    switch.connect("notify::active", on_switch)
+    method.connect("notify::selected", lambda row, _p: setattr(state, "stream_capture", values[row.get_selected()]))
+    group.add(switch)
+    group.add(method)
+    return switch, method
+
+
 class WizardPage(Adw.NavigationPage):
     def __init__(self, title, next_label="Next"):
         super().__init__(title=title)
@@ -429,10 +461,32 @@ class SetupWizard(Adw.Dialog):
 
         def next_page(*_):
             collect(self.state)
-            self._push(self._sign_in_page)
+            self._push(self._streaming_page)
 
         page.next_button.connect("clicked", next_page)
         return page
+
+    def _streaming_page(self):
+        page = WizardPage("Streaming")
+        page.next_button.set_visible(False)
+        status = Adw.StatusPage(
+            icon_name="video-display-symbolic",
+            title="Do You Stream Games From This PC?",
+            description=STREAMING_DESCRIPTION + " This can be changed later in Preferences.",
+        )
+        buttons = Gtk.Box(spacing=12, halign=Gtk.Align.CENTER)
+        for label, streams in (("No", False), ("Yes", True)):
+            button = Gtk.Button(label=label, width_request=120)
+            button.add_css_class("pill")
+            button.connect("clicked", lambda _b, v=streams: self._answer_streaming(v))
+            buttons.append(button)
+        status.set_child(buttons)
+        page.prefs.add(self._status_group(status))
+        return page
+
+    def _answer_streaming(self, streams):
+        self.state.stream = streams
+        self._push(self._sign_in_page)
 
     def _sign_in_page(self):
         page = WizardPage("Steam Account")
@@ -490,6 +544,7 @@ class SetupWizard(Adw.Dialog):
             ("Store Region", AUTO_REGION_LABEL if state.region_auto
              else f"{REGIONS.get(state.region, state.region)} ({state.region})"),
             ("Library Folders", "\n".join(short_path(p) for p in state.library_folders()) or "None"),
+            ("Streaming", "On, with Steam started for Remote Play" if state.stream else "Off"),
         ]:
             row = Adw.ActionRow(title=title, subtitle=value)
             row.add_css_class("property")

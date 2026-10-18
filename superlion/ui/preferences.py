@@ -5,11 +5,13 @@ import copy
 from gi.repository import Adw, Gtk
 
 from .. import config as config_mod
-from .. import sgdb, steam_paths
+from .. import sgdb, steam_control, steam_paths
 from .launch_options_prefs import LaunchOptionsPage
 from .sgdb_setup import SgdbKeySetup
 from .webview import clear_sign_in
-from .wizard import account_choice, apply_account, apply_install, install_choices, library_groups, region_choice
+from .wizard import (
+    account_choice, apply_account, apply_install, install_choices, library_groups, region_choice, streaming_rows,
+)
 
 
 class PreferencesDialog(Adw.PreferencesDialog):
@@ -61,6 +63,7 @@ class PreferencesDialog(Adw.PreferencesDialog):
         )
         row.connect("notify::active", lambda r, _p: setattr(self.state, "start_steam", r.get_active()))
         group.add(row)
+        streaming_rows(group, self.state)
         return group
 
     def _show_sign_in(self):
@@ -168,8 +171,16 @@ class PreferencesDialog(Adw.PreferencesDialog):
             apply_account(self.state, self.account, self.region)
             self.collect_libraries(self.state)
         if self.state != self.window.config:
+            streaming_changed = (self.state.stream, self.state.stream_capture) != (
+                self.window.config.stream, self.window.config.stream_capture
+            )
             config_mod.save(self.state)
             self.window.set_config(self.state)
+            if streaming_changed and steam_control.is_running(self.state):
+                self.window.ask_restart_steam(
+                    "Steam reads the streaming setting when it starts, so it needs to restart for "
+                    "the change to take effect."
+                )
 
     def _run_wizard(self):
         # The wizard starts from the saved settings; unsaved changes here are dropped.
