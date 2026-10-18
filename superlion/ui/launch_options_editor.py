@@ -16,6 +16,9 @@ PARSE_DELAY = 300  # milliseconds after the last keystroke
 
 CATEGORY_DESCRIPTIONS = {
     "Tools": "Programs that start the game.",
+    "Upscaling and Frame Generation": "These work on any graphics card.",
+    "NVIDIA": "These only work on NVIDIA graphics cards.",
+    "AMD": "These only work on AMD graphics cards.",
     "Game Arguments": "Passed to the game itself, after %command%.",
 }
 
@@ -135,6 +138,9 @@ class LaunchOptionsEditor(Adw.Dialog):
         box.append(heading)
         box.append(scroller)
         box.append(self.hint)
+        self.search = Gtk.SearchEntry(placeholder_text="Search settings", margin_top=6)
+        self.search.connect("search-changed", lambda *_: self._apply_search())
+        box.append(self.search)
         clamp = Adw.Clamp(child=box, maximum_size=640)
         return clamp
 
@@ -223,6 +229,7 @@ class LaunchOptionsEditor(Adw.Dialog):
             if group.get_parent():
                 self.page.remove(group)
         self.rows = {}
+        self.searchable = []  # (group, [(row, text to search)])
         self.page.add(self.top_group)
         self.category_groups = []
         for category in lo.CATEGORIES:
@@ -230,8 +237,13 @@ class LaunchOptionsEditor(Adw.Dialog):
             if not settings:
                 continue
             group = Adw.PreferencesGroup(title=category, description=CATEGORY_DESCRIPTIONS.get(category))
+            entries = []
             for setting in settings:
-                group.add(self._build_row(setting))
+                row = self._build_row(setting)
+                group.add(row)
+                text = " ".join((setting.title, setting.key, setting.description, category)).casefold()
+                entries.append((row, text))
+            self.searchable.append((group, entries))
             self.category_groups.append(group)
         more = Adw.PreferencesGroup()
         add = Adw.ButtonRow(title="Add Setting…", start_icon_name="list-add-symbolic")
@@ -240,6 +252,19 @@ class LaunchOptionsEditor(Adw.Dialog):
         self.category_groups.append(more)
         for group in self.category_groups:
             self.page.add(group)
+        self._apply_search()
+
+    def _apply_search(self):
+        """Show only the settings matching every word searched for, and hide empty groups."""
+        words = self.search.get_text().casefold().split()
+        for group, entries in self.searchable:
+            shown = 0
+            for row, text in entries:
+                visible = all(word in text for word in words)
+                row.set_visible(visible)
+                shown += visible
+            group.set_visible(bool(shown))
+        self.top_group.set_visible(not words)
 
     def _subtitle(self, setting):
         parts = [setting.description, _usage(setting)]
