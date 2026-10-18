@@ -160,12 +160,12 @@ class LaunchOptionsPage(Adw.PreferencesPage):
             row = _options_row(name, options, lambda a=appid, n=name, o=options: self._edit_game(a, n, o))
             existing = launch_presets.find_by_options(options)
             if existing:
-                saved = Gtk.Image(icon_name="user-bookmarks-symbolic", tooltip_text=f"Saved as preset “{existing.name}”")
+                saved = Gtk.Image(icon_name="emblem-ok-symbolic", tooltip_text=f"Saved as preset “{existing.name}”")
                 saved.add_css_class("dim-label")
                 row.add_suffix(saved)
             else:
                 row.add_suffix(_icon_button(
-                    "bookmark-new-symbolic", "Save as Preset", lambda n=name, o=options: self._new_preset(o, n)
+                    "media-floppy-symbolic", "Save as Preset", lambda n=name, o=options: self._new_preset(o, n)
                 ))
             _go_next(row)
             group.add(row)
