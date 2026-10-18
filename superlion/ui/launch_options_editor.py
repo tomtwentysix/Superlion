@@ -30,6 +30,29 @@ def describe_warning(warning):
     return f"{WARNING_LABELS[warning.kind]}: {warning.text}"
 
 
+def warning_row(title, warning, ignored, on_fix, on_ignore):
+    """A row for a warning, with buttons to fix it and to ignore it (on_ignore(ignore)); either can be None."""
+    text = describe_warning(warning)
+    row = Adw.ActionRow(
+        title=GLib.markup_escape_text(title),
+        subtitle=GLib.markup_escape_text(f"Ignored · {text}" if ignored else text),
+    )
+    icon = Gtk.Image(icon_name="dialog-warning-symbolic")
+    icon.add_css_class("dim-label" if ignored else "warning")
+    row.add_prefix(icon)
+    if on_fix:
+        button = Gtk.Button(label=lo.fix_label(warning), valign=Gtk.Align.CENTER)
+        button.add_css_class("flat")
+        button.connect("clicked", lambda *_: on_fix())
+        row.add_suffix(button)
+    if on_ignore:
+        button = Gtk.Button(label="Stop Ignoring" if ignored else "Ignore", valign=Gtk.Align.CENTER)
+        button.add_css_class("flat")
+        button.connect("clicked", lambda *_: on_ignore(not ignored))
+        row.add_suffix(button)
+    return row
+
+
 def _usage(setting):
     if setting.games == 0:
         return "Not used in your games yet"
@@ -68,10 +91,14 @@ class LaunchOptionsEditor(Adw.Dialog):
 
     __gsignals__ = {"done": (GObject.SignalFlags.RUN_FIRST, None, (str,))}
 
-    def __init__(self, window, options="", game_name="", preset=None, new_preset=False, appid=None):
+    def __init__(
+        self, window, options="", game_name="", preset=None, new_preset=False, appid=None, warnings_appid=None
+    ):
         self.window = window
         self.game_name = game_name
         self.appid = appid  # When set, Save writes the launch options to Steam for this game.
+        # The game whose warnings can be ignored here.
+        self.warnings_appid = warnings_appid if warnings_appid is not None else appid
         self.preset = preset
         self.for_preset = preset is not None or new_preset
         if self.for_preset:
@@ -288,29 +315,37 @@ class LaunchOptionsEditor(Adw.Dialog):
             self.warning_group.remove(row)
         self.warning_rows = []
         found = lo.warnings(self.text())
+        ignored = lo.ignored_warnings().get(self.warnings_appid, set()) if self.warnings_appid is not None else set()
         for icon in self.warning_icons.values():
             icon.set_visible(False)
         for warning in found:
             setting = self.settings.get(warning.key) or lo.setting_for(*warning.key)
-            row = Adw.ActionRow(
-                title=GLib.markup_escape_text(setting.title),
-                subtitle=GLib.markup_escape_text(describe_warning(warning)),
+            is_ignored = warning.id in ignored
+            row = warning_row(
+                setting.title, warning, is_ignored,
+                lambda w=warning: self._fix(w),
+                (lambda ignore, w=warning: self._ignore(w, ignore)) if self.warnings_appid is not None else None,
             )
-            icon = Gtk.Image(icon_name="dialog-warning-symbolic")
-            icon.add_css_class("warning")
-            row.add_prefix(icon)
             target = self.rows.get(warning.key)
             if target:
                 row.set_activatable(True)
-                row.add_suffix(Gtk.Image(icon_name="go-next-symbolic"))
                 row.connect("activated", lambda _r, t=target[0]: t.grab_focus())
             self.warning_group.add(row)
             self.warning_rows.append(row)
             icon = self.warning_icons.get(warning.key)
-            if icon:
+            if icon and not is_ignored:
                 icon.set_visible(True)
                 icon.set_tooltip_text(describe_warning(warning))
         self.warning_group.set_visible(bool(found) and not self.search.get_text().split())
+
+    def _fix(self, warning):
+        options = lo.fix(self.text(), warning)
+        self._set_text(options)
+        self._read_text(options)
+
+    def _ignore(self, warning, ignore):
+        lo.set_ignored(self.warnings_appid, warning, ignore)
+        self._update_warnings()
 
     def _subtitle(self, setting):
         parts = [setting.description, _usage(setting)]

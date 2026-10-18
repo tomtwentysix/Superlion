@@ -5,7 +5,7 @@ from gi.repository import Adw, GLib, Gtk
 from .. import launch_options as lo
 from .. import launch_presets
 from .add_launch_setting import AddLaunchSettingDialog
-from .launch_options_editor import LaunchOptionsEditor
+from .launch_options_editor import LaunchOptionsEditor, warning_row
 
 PAGE_NAME = "launch-options"
 
@@ -40,12 +40,18 @@ class LaunchOptionsPage(Adw.PreferencesPage):
         self.dialog = dialog
         self.window = window
         self.groups = []
+        self.expanded = set()  # Games whose warnings are shown, kept open across refreshes.
         self.refresh()
 
     def refresh(self):
         for group in self.groups:
             self.remove(group)
-        self.groups = [self._build_presets(), self._build_settings(), self._build_games()]
+        config = self.window.config
+        self.configured = launch_presets.configured_games(config) if config else {}
+        self.groups = [
+            self._build_presets(), self._build_warnings(), self._build_used_settings(),
+            self._build_settings(), self._build_games(),
+        ]
         for group in self.groups:
             self.add(group)
 
@@ -76,7 +82,7 @@ class LaunchOptionsPage(Adw.PreferencesPage):
         return button
 
     def _open_editor(self, editor):
-        editor.connect("done", lambda *_: self.refresh())
+        editor.connect("closed", lambda *_: self.refresh())  # After saving, or ignoring warnings.
         editor.present(self.dialog)
 
     def _new_preset(self, options="", game_name=""):
@@ -130,6 +136,113 @@ class LaunchOptionsPage(Adw.PreferencesPage):
             group.add(row)
         return group
 
+    def _build_warnings(self):
+        group = Adw.PreferencesGroup(
+            title="Warnings",
+            description="Settings in your games' launch options that are not needed on this computer, or cause problems.",
+        )
+        ignored = lo.ignored_warnings()
+        entries = []
+        for appid, options in self.configured.items():
+            found = lo.warnings(options)
+            if found:
+                entries.append((self._game_name(appid), appid, options, found))
+        if not entries:
+            group.add(Adw.ActionRow(title="No Warnings"))
+        for name, appid, options, found in sorted(entries, key=lambda e: e[0].casefold()):
+            game_ignored = ignored.get(appid, set())
+            count = sum(w.id not in game_ignored for w in found)
+            parts = [f"{count} warning{'s' if count != 1 else ''}"]
+            if len(found) > count:
+                parts.append(f"{len(found) - count} ignored")
+            expander = Adw.ExpanderRow(
+                title=GLib.markup_escape_text(name), subtitle=" · ".join(parts), expanded=appid in self.expanded,
+            )
+            expander.connect("notify::expanded", lambda r, _p, a=appid: self._remember_expanded(a, r.get_expanded()))
+            for warning in found:
+                expander.add_row(warning_row(
+                    lo.setting_for(*warning.key).title, warning, warning.id in game_ignored,
+                    lambda a=appid, o=options, w=warning: self._fix(a, o, w),
+                    lambda ignore, a=appid, w=warning: (lo.set_ignored(a, w, ignore), self.refresh()),
+                ))
+            edit = Adw.ButtonRow(title="Edit Launch Options…")
+            edit.connect("activated", lambda *_, a=appid, n=name, o=options: self._edit_game(a, n, o))
+            expander.add_row(edit)
+            group.add(expander)
+        return group
+
+    def _remember_expanded(self, appid, expanded):
+        if expanded:
+            self.expanded.add(appid)
+        else:
+            self.expanded.discard(appid)
+
+    def _fix(self, appid, options, warning):
+        changes = {"launch_options": lo.fix(options, warning)}
+        self.window.apply_game_settings(appid, changes, lambda *_: self.refresh(), parent=self.dialog)
+
+    def _build_used_settings(self):
+        group = Adw.PreferencesGroup(
+            title="Settings in Your Games",
+            description="Turn a setting on or off for all your installed games at once.",
+        )
+        settings = [s for s in lo.baseline(self.configured.values()).values() if s.games]
+        settings.sort(key=lambda s: (-s.games, s.title.casefold()))
+        if not settings:
+            group.add(Adw.ActionRow(title="No games have launch options set."))
+        for setting in settings:
+            parts = [setting.key if setting.kind == lo.ENV and setting.title != setting.key else "",
+                     f"Used in {setting.games} game{'s' if setting.games != 1 else ''}"]
+            row = Adw.ActionRow(
+                title=GLib.markup_escape_text(setting.title),
+                subtitle=GLib.markup_escape_text(" · ".join(p for p in parts if p)),
+            )
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+            popover = Gtk.Popover(child=box)
+            popover.add_css_class("menu")
+            for label, on in (("Turn On for All Games", True), ("Turn Off for All Games", False)):
+                button = Gtk.Button(child=Gtk.Label(label=label, xalign=0))
+                button.add_css_class("flat")
+                button.connect("clicked", lambda _b, s=setting, o=on: (popover.popdown(), self._confirm_all(s, o)))
+                box.append(button)
+            menu = Gtk.MenuButton(icon_name="view-more-symbolic", popover=popover, valign=Gtk.Align.CENTER,
+                                  tooltip_text="All Games")
+            menu.add_css_class("flat")
+            row.add_suffix(menu)
+            group.add(row)
+        return group
+
+    def _confirm_all(self, setting, on):
+        value = setting.common_value
+        games = {g.props.appid for g in self.window.installed} | set(self.configured)
+        changes = {}
+        for appid in games:
+            options = self.configured.get(appid, "")
+            updated = lo.with_setting(options, setting.kind, setting.key, value, on)
+            if updated != options:
+                changes[appid] = {"launch_options": updated}
+        if not changes:
+            self.window.toast(f"“{setting.title}” is already {'on' if on else 'off'} for all your games")
+            return
+        written = f"{setting.key}={lo.quote(value)}" if setting.kind == lo.ENV else " ".join(
+            p for p in (setting.key, value) if p
+        )
+        count = f"{len(changes)} game{'s' if len(changes) != 1 else ''}"
+        alert = Adw.AlertDialog(
+            heading=f"Turn {'On' if on else 'Off'} “{setting.title}” for All Games?",
+            body=f"{written} will be {'added to' if on else 'removed from'} the launch options of {count}.",
+        )
+        alert.add_response("cancel", "Cancel")
+        alert.add_response("apply", f"Turn {'On' if on else 'Off'}")
+        alert.set_response_appearance("apply", Adw.ResponseAppearance.SUGGESTED)
+        alert.set_close_response("cancel")
+        alert.connect(
+            "response",
+            lambda _a, response: response == "apply"
+            and self.window.apply_settings(changes, self.refresh, parent=self.dialog),
+        )
+        alert.present(self.dialog)
+
     def _add_setting(self):
         config = self.window.config
         present = lo.baseline(launch_presets.configured_games(config).values() if config else []).keys()
@@ -142,10 +255,8 @@ class LaunchOptionsPage(Adw.PreferencesPage):
             title="Your Games",
             description="Launch options set for your games. Choose one to change it, or to save it as a preset.",
         )
-        config = self.window.config
-        configured = launch_presets.configured_games(config) if config else {}
         entries = sorted(
-            ((appid, self._game_name(appid), options) for appid, options in configured.items()),
+            ((appid, self._game_name(appid), options) for appid, options in self.configured.items()),
             key=lambda entry: entry[1].casefold(),
         )
         if not entries:

@@ -55,10 +55,7 @@ class PreferencesDialog(Adw.PreferencesDialog):
         group = Adw.PreferencesGroup(title="Steam Client")
         row = Adw.SwitchRow(
             title="Start Steam With Superlion",
-            subtitle=(
-                "Starts Steam hidden when Superlion opens, so games, downloads and installs are "
-                "ready without Steam's window appearing"
-            ),
+            subtitle="Runs Steam hidden in the background",
             active=self.state.start_steam,
         )
         row.connect("notify::active", lambda r, _p: setattr(self.state, "start_steam", r.get_active()))

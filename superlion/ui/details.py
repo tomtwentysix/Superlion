@@ -532,7 +532,8 @@ class GameDetailsPage(Adw.NavigationPage):
         return self.warnings_note
 
     def _show_warnings(self):
-        found = lo.warnings(self.launch_options)
+        ignored = lo.ignored_warnings().get(self.game.props.appid, set())
+        found = [w for w in lo.warnings(self.launch_options) if w.id not in ignored]
         self.warnings_note.set_visible(bool(found))
         if found:
             count = len(found)
@@ -549,8 +550,11 @@ class GameDetailsPage(Adw.NavigationPage):
         self._show_warnings()
 
     def _edit_launch_options(self):
-        editor = LaunchOptionsEditor(self.window, self.launch_options, game_name=self.game.props.name)
+        editor = LaunchOptionsEditor(
+            self.window, self.launch_options, game_name=self.game.props.name, warnings_appid=self.game.props.appid
+        )
         editor.connect("done", self._on_launch_options_chosen)
+        editor.connect("closed", lambda *_: self._show_warnings())  # Warnings may have been ignored.
         editor.present(self.window)
 
     def _on_launch_options_chosen(self, _editor, options):

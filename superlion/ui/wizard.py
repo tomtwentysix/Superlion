@@ -330,10 +330,7 @@ def library_groups(add_group, state, get_parent):
     return collect
 
 
-STREAMING_DESCRIPTION = (
-    "For Steam Remote Play to a Steam Deck, Steam Link, phone or another computer. "
-    "Steam is started with PipeWire screen capture, which streaming needs on Wayland."
-)
+STREAMING_DESCRIPTION = "Turns on screen capture for Steam Remote Play and Steam Link"
 
 
 def streaming_rows(group, state):
@@ -472,7 +469,7 @@ class SetupWizard(Adw.Dialog):
         status = Adw.StatusPage(
             icon_name="video-display-symbolic",
             title="Do You Stream Games From This PC?",
-            description=STREAMING_DESCRIPTION + " This can be changed later in Preferences.",
+            description=STREAMING_DESCRIPTION + ". This can be changed later in Preferences.",
         )
         buttons = Gtk.Box(spacing=12, halign=Gtk.Align.CENTER)
         for label, streams in (("No", False), ("Yes", True)):

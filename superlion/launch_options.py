@@ -557,7 +557,13 @@ OPPOSITES = {
 class LaunchWarning:
     key: tuple  # (kind, key) of the setting it is about
     kind: str  # NOT_NEEDED or BREAKS
+    rule: str  # The check that found it, such as "duplicate"
     text: str
+
+    @property
+    def id(self):
+        """Stays the same while the setting is unchanged, so an ignored warning stays ignored."""
+        return f"{self.rule}:{self.key[0]}:{self.key[1]}"
 
 
 @cache
@@ -593,8 +599,8 @@ def warnings(options, custom=None):
     on = {name for name, value in env.items() if _is_on(value)}
     found = []
 
-    def warn(name, kind, text, setting_kind=ENV):
-        found.append(LaunchWarning((setting_kind, name), kind, text))
+    def warn(name, kind, rule, text, setting_kind=ENV):
+        found.append(LaunchWarning((setting_kind, name), kind, rule, text))
 
     def named(name):
         title = setting_for(ENV, name, custom).title
@@ -602,39 +608,39 @@ def warnings(options, custom=None):
 
     for name, count in Counter(name for name, _value in parsed.env).items():
         if count > 1:
-            warn(name, NOT_NEEDED, f"Set {count} times. Only the last value is used.")
+            warn(name, NOT_NEEDED, "duplicate", f"Set {count} times. Only the last value is used.")
 
     vendors = graphics_vendors()
     for kind, key in [(ENV, name) for name in env] + [(WRAPPER, name) for name in parsed.wrappers]:
         category = setting_for(kind, key, custom).category
         if category in ("NVIDIA", "AMD") and vendors and category not in vendors:
-            warn(key, NOT_NEEDED, f"No {category} graphics card was found.", kind)
+            warn(key, NOT_NEEDED, "vendor", f"No {category} graphics card was found.", kind)
 
     if "WINE_DLL_OVERRIDES" in env:
-        warn("WINE_DLL_OVERRIDES", NOT_NEEDED, "Wine does not read this name. Use DLL Overrides (WINEDLLOVERRIDES).")
+        warn("WINE_DLL_OVERRIDES", NOT_NEEDED, "misspelt", "Wine does not read this name. Use DLL Overrides (WINEDLLOVERRIDES).")
     if env.get("PROTON_USE_PIPEWIRE") == "1":
-        warn("PROTON_USE_PIPEWIRE", NOT_NEEDED, "PipeWire audio is already the default.")
+        warn("PROTON_USE_PIPEWIRE", NOT_NEEDED, "default", "PipeWire audio is already the default.")
 
     hdr_capable = "PROTON_ENABLE_WAYLAND" in on or "gamescope" in parsed.wrappers
     for name in HDR_VARIABLES:
         if name not in on:
             continue
         if not hdr_capable:
-            warn(name, NOT_NEEDED, "HDR only works with Wayland (PROTON_ENABLE_WAYLAND=1) or Gamescope.")
+            warn(name, NOT_NEEDED, "hdr-display", "HDR only works with Wayland (PROTON_ENABLE_WAYLAND=1) or Gamescope.")
         elif name == "ENABLE_HDR_WSI" and vendors == {"NVIDIA"} and nvidia_driver() >= 595:
-            warn(name, NOT_NEEDED, "NVIDIA drivers from 595 output HDR without this layer.")
+            warn(name, NOT_NEEDED, "hdr-driver", "NVIDIA drivers from 595 output HDR without this layer.")
 
     for name, opposite in OPPOSITES.items():
         if name in on and opposite in on:
-            warn(name, BREAKS, f"Undoes {named(opposite)}, which is also set.")
+            warn(name, BREAKS, "opposite", f"Undoes {named(opposite)}, which is also set.")
 
     if "LD_PRELOAD" in env and not env["LD_PRELOAD"].strip("\"'"):
         warn(
-            "LD_PRELOAD", BREAKS,
+            "LD_PRELOAD", BREAKS, "overlay",
             "Stops the Steam overlay and its screenshots. On Wayland, Steam Remote Play and Steam Link show no picture.",
         )
     if "PROTON_PREFER_SDL" in on:
-        warn("PROTON_PREFER_SDL", BREAKS, "Controller layouts set in Steam Input are not used.")
+        warn("PROTON_PREFER_SDL", BREAKS, "steam-input", "Controller layouts set in Steam Input are not used.")
     return found
 
 
@@ -766,3 +772,84 @@ def summary(options, custom=None):
             parts.append(setting.title)
     parts += parsed.other
     return ", ".join(parts) if parts else "None"
+
+
+def fix_label(warning):
+    return {"duplicate": "Keep Last", "misspelt": "Rename"}.get(warning.rule, "Remove")
+
+
+def fix(options, warning):
+    """The launch options with the warning's setting removed; a duplicate keeps its last value and a misspelt name is corrected."""
+    parsed = parse(options, custom_programs())
+    kind, key = warning.key
+    if kind == ENV:
+        last = max((i for i, (name, _value) in enumerate(parsed.env) if name == key), default=-1)
+        env = []
+        for i, (name, value) in enumerate(parsed.env):
+            if name != key:
+                env.append((name, value))
+            elif warning.rule == "duplicate" and i == last:
+                env.append((name, value))
+            elif warning.rule == "misspelt" and i == last and "WINEDLLOVERRIDES" not in dict(parsed.env):
+                env.append(("WINEDLLOVERRIDES", value))
+        parsed.env = env
+    elif kind == WRAPPER:
+        parsed.wrappers.pop(key, None)
+    else:
+        parsed.arguments = [a for a in parsed.arguments if a != key]
+    return compose(parsed.env, parsed.wrappers, parsed.other, parsed.arguments)
+
+
+def has_setting(options, kind, key):
+    parsed = parse(options, custom_programs())
+    if kind == ENV:
+        return key in dict(parsed.env)
+    return key in (parsed.wrappers if kind == WRAPPER else parsed.arguments)
+
+
+def with_setting(options, kind, key, value="", on=True):
+    """The launch options with a setting switched on (with this value) or off; unchanged if already so."""
+    parsed = parse(options, custom_programs())
+    if kind == ENV:
+        current = dict(parsed.env)
+        if (current.get(key) == value) if on else key not in current:
+            return options
+        parsed.env = [(name, v) for name, v in parsed.env if name != key] + ([(key, value)] if on else [])
+    elif kind == WRAPPER:
+        if (parsed.wrappers.get(key, None) == value) if on else key not in parsed.wrappers:
+            return options
+        parsed.wrappers.pop(key, None)
+        if on:
+            parsed.wrappers[key] = value
+    else:
+        if (key in parsed.arguments) == on:
+            return options
+        parsed.arguments = [a for a in parsed.arguments if a != key] + ([key] if on else [])
+    return compose(parsed.env, parsed.wrappers, parsed.other, parsed.arguments)
+
+
+def _ignored_path():
+    return config_mod.config_dir() / "ignored_warnings.json"
+
+
+def ignored_warnings():
+    """{app ID: {warning ID}} for the warnings the user chose to ignore."""
+    try:
+        data = json.loads(_ignored_path().read_text())
+    except (OSError, ValueError):
+        return {}
+    return {int(appid): set(ids) for appid, ids in data.items() if appid.isdigit()}
+
+
+def set_ignored(appid, warning, ignore=True):
+    ignored = ignored_warnings()
+    ids = ignored.setdefault(int(appid), set())
+    if ignore:
+        ids.add(warning.id)
+    else:
+        ids.discard(warning.id)
+    path = _ignored_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps({str(a): sorted(i) for a, i in ignored.items() if i}, indent=2))
+    os.replace(tmp, path)
