@@ -316,7 +316,7 @@ class StoreAppPage(Adw.NavigationPage):
             primary.connect("clicked", lambda *_: self._open_uri(f"steam://rungameid/{self.appid}"))
         elif game is not None:
             primary = Gtk.Button(label="Install")
-            primary.connect("clicked", lambda *_: self._open_uri(f"steam://install/{self.appid}"))
+            primary.connect("clicked", lambda *_: self.window.install_game(self.appid, game.props.name))
         else:
             primary = Gtk.Button(label="Buy")
             primary.connect("clicked", lambda *_: self.window.open_web(page_url, data.get("name", "Store")))

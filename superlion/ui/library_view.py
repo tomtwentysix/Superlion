@@ -2,7 +2,7 @@
 
 from gi.repository import Adw, Gio, GLib, Gtk, Pango
 
-from .. import downloads, game_collections, library, mod_managers, owned, steam_control
+from .. import downloads, game_collections, library, mod_managers, owned
 from . import images
 
 COVER_W, COVER_H = 150, 225
@@ -119,11 +119,7 @@ class LibraryTile(Gtk.Box):
         images.load(self.game.props.cover, COVER_W * 2, COVER_H * 2, apply)
 
     def _on_install(self, _button):
-        try:
-            steam_control.open_uri(self.window.config, f"steam://install/{self.game.props.appid}")
-            self.window.toast(f"Opening the Steam install dialog for {self.game.props.name}")
-        except GLib.Error as error:
-            self.window.toast(f"Steam could not be opened: {error.message}")
+        self.window.install_game(self.game.props.appid, self.game.props.name)
 
     def _show_menu(self):
         if self.game is None:
@@ -166,7 +162,7 @@ def game_menu(window, game):
         action("play", lambda: window.launch(game.run_uri, f"Launching {game.props.name}"))
     else:
         main.append("Install", "game.install")
-        action("install", lambda: window.launch(f"steam://install/{appid}", "Opening the Steam install dialog"))
+        action("install", lambda: window.install_game(appid, game.props.name))
     main.append("Show Details", "game.details")
     action("details", lambda: window.open_game(game))
     if game.props.store_appid:

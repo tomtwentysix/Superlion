@@ -572,7 +572,7 @@ class GameDetailsPage(Adw.NavigationPage):
         self._open(self.game.run_uri, f"Launching {self.game.props.name}")
 
     def _on_install(self, _button):
-        self._open(f"steam://install/{self.game.props.appid}", "Opening the Steam install dialog")
+        self.window.install_game(self.game.props.appid, self.game.props.name)
 
     def _open(self, uri, message):
         try:
