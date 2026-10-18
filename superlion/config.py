@@ -2,6 +2,7 @@
 
 import json
 import os
+import shutil
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -9,7 +10,11 @@ from gi.repository import GLib
 
 from . import steam_paths
 
-APP_NAME = "superlion"
+# Set by run-dev.sh, so a development copy keeps its own settings, keys and app ID.
+DEVEL = os.environ.get("SUPERLION_DEVEL") == "1"
+APP_NAME = "superlion-devel" if DEVEL else "superlion"
+ICON_NAME = "uk.co.solarflareit.Superlion"
+APP_ID = ICON_NAME + (".Devel" if DEVEL else "")
 
 
 def config_dir():
@@ -89,6 +94,18 @@ def load():
         return None
     known = Config.__dataclass_fields__
     return Config(**{k: v for k, v in data.items() if k in known})
+
+
+def seed_devel():
+    """Give a new development copy a starting point from the installed app's settings."""
+    if not DEVEL or config_dir().exists():
+        return
+    main = Path(GLib.get_user_config_dir()) / "superlion"
+    config_dir().mkdir(parents=True)
+    # collections.json is left out: it can hold edits still waiting to be synced to Steam.
+    for name in ("config.json", "launch_presets.json", "mod_managers.json", "steam_matches.json"):
+        if (main / name).is_file():
+            shutil.copy2(main / name, config_dir() / name)
 
 
 def save(config):

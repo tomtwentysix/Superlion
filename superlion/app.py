@@ -12,7 +12,6 @@ from gi.repository import Adw, Gdk, Gio, Gtk  # noqa: E402
 from . import config as config_mod  # noqa: E402
 from .ui.dedication import COMPANY, DEDICATION, KNOWN_FOR, NAME, TRIBUTE, YEARS  # noqa: E402
 
-APP_ID = "uk.co.solarflareit.Superlion"
 PACKAGE_DIR = Path(__file__).parent
 # The interface's own icons, and the application icon kept with the project data.
 ICON_DIRS = (PACKAGE_DIR / "icons", PACKAGE_DIR.parent / "data" / "icons")
@@ -22,7 +21,7 @@ DEVELOPER = "SolarFlare Developments"
 
 class SuperlionApplication(Adw.Application):
     def __init__(self):
-        super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.DEFAULT_FLAGS)
+        super().__init__(application_id=config_mod.APP_ID, flags=Gio.ApplicationFlags.DEFAULT_FLAGS)
         self._add_action("quit", lambda *_: self.quit(), ["<primary>q"])
         self._add_action("about", self._on_about)
         self._add_action("dedication", self._on_dedication)
@@ -40,7 +39,7 @@ class SuperlionApplication(Adw.Application):
         theme = Gtk.IconTheme.get_for_display(Gdk.Display.get_default())
         for folder in ICON_DIRS:
             theme.add_search_path(str(folder))
-        Gtk.Window.set_default_icon_name(APP_ID)
+        Gtk.Window.set_default_icon_name(config_mod.ICON_NAME)
 
     def do_activate(self):
         from .ui.window import SuperlionWindow
@@ -48,6 +47,7 @@ class SuperlionApplication(Adw.Application):
         window = self.props.active_window
         if window is None:
             window = SuperlionWindow(application=self)
+            config_mod.seed_devel()
             config = config_mod.load()
             window.set_config(config)
             window.present()
@@ -67,7 +67,7 @@ class SuperlionApplication(Adw.Application):
     def _on_about(self, *_):
         about = Adw.AboutDialog(
             application_name="Superlion",
-            application_icon=APP_ID,
+            application_icon=config_mod.ICON_NAME,
             developer_name=DEVELOPER,
             copyright=f"© 2026 {DEVELOPER}",
             version=VERSION,

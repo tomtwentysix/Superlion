@@ -20,7 +20,7 @@ KEY_PAGE = "https://www.steamgriddb.com/profile/preferences/api"
 TIMEOUT = 20
 
 SCHEMA = Secret.Schema.new(
-    "uk.co.solarflareit.Superlion.SteamGridDB",
+    f"{config_mod.APP_ID}.SteamGridDB",
     Secret.SchemaFlags.NONE,
     {"kind": Secret.SchemaAttributeType.STRING},
 )
