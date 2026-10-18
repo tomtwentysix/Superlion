@@ -1,5 +1,5 @@
 Name:           superlion
-Version:        0.7.2
+Version:        0.7.3
 Release:        1%{?dist}
 Summary:        Native GNOME front end for your Steam library
 License:        GPL-3.0-or-later
@@ -62,6 +62,9 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/uk.co.solarflareit.Su
 %{_datadir}/icons/hicolor/*/apps/uk.co.solarflareit.Superlion*
 
 %changelog
+* Sun Oct 18 2026 Tom <tom@solarflareit.co.uk> - 0.7.3-1
+- Use bookmark icons for saving launch options as a preset, instead of an icon that looked like a download.
+
 * Sun Oct 18 2026 Tom <tom@solarflareit.co.uk> - 0.7.2-1
 - Name and describe the NVIDIA CUDA, DLSS 5 Vulkan Layer and Keep Mouse in Window launch settings.
 
