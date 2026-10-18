@@ -7,6 +7,7 @@ from .. import config as config_mod
 from . import images
 from .details import GameDetailsPage
 from .downloads_view import DownloadsView
+from .install_dialog import install_game
 from .library_view import GROUP_TITLES, LibraryView
 from .store import StoreAppPage, StoreView
 from .steam_key_setup import SteamKeyDialog
@@ -921,7 +922,11 @@ class SuperlionWindow(Adw.ApplicationWindow):
         dialog.connect("response", on_response)
         dialog.present(parent or self)
 
-    def relaunch_steam(self):
+    def install_game(self, appid, name=""):
+        install_game(self, appid, name)
+
+    def relaunch_steam(self, reload=False):
+        """Close Steam, write waiting changes, and start it again; reload re-reads the library."""
         if self._relaunching:
             return
         self._relaunching = True
@@ -934,6 +939,8 @@ class SuperlionWindow(Adw.ApplicationWindow):
             self.toast(error or "Changes written and Steam restarted")
             self.library.refresh_sidebar()
             self.update_pending()
+            if reload and not error:
+                self.reload()
 
         steam_control.relaunch(self.config, lambda: pending.apply_now(self.config), done)
 

@@ -9,6 +9,7 @@ Superlion is dedicated to the memory of John Wharton of S J Wharton Ltd (1953–
 ### Library
 - Installed games from every Steam library folder, plus non-Steam games added to Steam, with Steam's cover art and any custom artwork you have set.
 - Once your Steam account is connected, the games you own but have not installed, each with an **Install** button on its cover.
+- **Install** asks which library folder to use, showing the download size and each drive's free space, then has Steam download the game there, restarting Steam if it is running. **Use Steam's Dialog** opens Steam's own install dialog instead.
 - A sidebar with views (All Games, Installed, Not Installed, VR Games, Non-Steam Games, Mod Managers), Steam's own collections, and your own collections.
 - Search that ignores case, punctuation and ™, and matches initials (“re3” finds *Resident Evil 3*) and app IDs.
 - Sort by name, size, last played or release date, and group by genre, release year or installed state.

@@ -4,7 +4,7 @@ import json
 import os
 
 from . import config as config_mod
-from . import game_collections, steam_control, steam_settings
+from . import game_collections, installer, steam_control, steam_settings
 
 # Queue key for "sync Superlion's collections to Steam"; app ID 0 is never a game.
 COLLECTIONS_KEY = 0
@@ -71,6 +71,13 @@ def apply_now(config):
     if sync:
         # Queues saved before include_own existed meant a full sync.
         game_collections.sync_to_steam(config, include_own=sync.get("include_own", True))
+        _save(queue)
+    # Installs are written first, each removed from the queue once its manifest exists.
+    for appid in [a for a, changes in queue.items() if "install" in changes]:
+        install = queue[appid].pop("install")
+        installer.write_manifest(config, appid, install["library"], install["name"], install["installdir"])
+        if not queue[appid]:
+            del queue[appid]
         _save(queue)
     if queue:
         steam_settings.write_changes(config, queue)

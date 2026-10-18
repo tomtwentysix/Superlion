@@ -12,7 +12,7 @@ from pathlib import Path
 
 from . import config as config_mod
 
-CACHE_VERSION = 3  # Raised when the extracted fields change, so old caches are rebuilt.
+CACHE_VERSION = 4  # Raised when the extracted fields change, so old caches are rebuilt.
 
 VR_NONE, VR_SUPPORTED, VR_REQUIRED = 0, 1, 2
 # Store categories: 31 "VR Support" (older), 53 "VR Supported", 54 "VR Only".
@@ -118,7 +118,8 @@ def _parse(data):
             node, _ = read_map(start + header)
         except (ValueError, IndexError, struct.error):
             node = {}
-        common = (node.get("appinfo") or {}).get("common") or {}
+        info = node.get("appinfo") or {}
+        common = info.get("common") or {}
         release = common.get("original_release_date") or common.get("steam_release_date") or 0
         genre_ids = (common.get("genres") or {}).values()
         apps[appid] = {
@@ -128,9 +129,42 @@ def _parse(data):
             "vr": _vr_level(common),
             # Retired genre IDs that the store no longer shows are skipped.
             "genres": [GENRES[int(g)] for g in genre_ids if str(g).isdigit() and int(g) in GENRES],
+            "installdir": str((info.get("config") or {}).get("installdir", "")),
+            "download_size": _download_size(info.get("depots") or {}),
         }
         pos = start + size
     return apps
+
+
+def _depot_size(depot):
+    manifest = (depot.get("manifests") or {}).get("public")
+    size = manifest.get("size") if isinstance(manifest, dict) else depot.get("maxsize")
+    return int(size) if str(size or "").isdigit() else 0
+
+
+def _download_size(depots):
+    """An estimate of the base game's installed size, in bytes; 0 when unknown.
+
+    Counts the depots without a DLC, a language other than English or a shared
+    install, for Linux if the game has Linux depots, otherwise for Windows.
+    """
+    by_os = {"linux": 0, "windows": 0}
+    for key, depot in depots.items():
+        if not str(key).isdigit() or not isinstance(depot, dict):
+            continue
+        config = depot.get("config") or {}
+        if depot.get("dlcappid") or depot.get("sharedinstall") or config.get("language", "english") not in ("", "english"):
+            continue
+        systems = str(config.get("oslist", "")).split(",")
+        size = _depot_size(depot)
+        for system in by_os:
+            if system in systems or systems == [""]:
+                by_os[system] += size
+    linux_only = any(
+        str(k).isdigit() and isinstance(d, dict) and "linux" in str((d.get("config") or {}).get("oslist", ""))
+        for k, d in depots.items()
+    )
+    return by_os["linux"] if linux_only else by_os["windows"]
 
 
 def _vr_level(common):
