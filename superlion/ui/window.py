@@ -311,6 +311,9 @@ class SuperlionWindow(Adw.ApplicationWindow):
             if self.config.root.is_dir()
             else []
         )
+        if config_mod.SCREENSHOTS and not self.api_key:
+            self._show_games(owned.SAMPLE_GAMES)
+            return
         self._show_games(owned.load_cached() if self.api_key else [])
         if self.api_key:
             self._refresh_owned()
@@ -519,7 +522,7 @@ class SuperlionWindow(Adw.ApplicationWindow):
         signed_in = bool(self.api_key)
         self.lookup_action("sign-in").set_enabled(not signed_in)
         self.lookup_action("sign-out").set_enabled(signed_in)
-        self.library.signed_in = signed_in
+        self.library.signed_in = signed_in or config_mod.SCREENSHOTS
         self.library.refresh_sidebar()
         self._load_account_country()
 

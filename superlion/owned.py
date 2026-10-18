@@ -19,6 +19,15 @@ REMOTE_ART = {
     "header": "header.jpg",
 }
 
+# Owned games shown in screenshot mode when no Steam account is connected.
+SAMPLE_GAMES = [
+    {"appid": 620, "name": "Portal 2"},
+    {"appid": 1145360, "name": "Hades"},
+    {"appid": 367520, "name": "Hollow Knight"},
+    {"appid": 413150, "name": "Stardew Valley"},
+    {"appid": 1086940, "name": "Baldur's Gate 3"},
+]
+
 
 def _cache_path():
     return config_mod.cache_dir() / "owned.json"
