@@ -4,6 +4,7 @@ from gi.repository import Adw, GLib, GObject, Gtk, Pango
 
 from .. import launch_options as lo
 from .. import launch_presets
+from .add_launch_setting import AddLaunchSettingDialog
 
 
 def _usage(setting):
@@ -27,7 +28,7 @@ class LaunchOptionsBuilder(Adw.Dialog):
         self.settings = lo.baseline(others)
         self.state = {}  # (kind, key) -> {"enabled": bool, "value": str}
 
-        current = lo.parse(options)
+        current = lo.parse(options, lo.custom_programs())
         # Variables the game already has keep their order; new ones follow.
         self.order = {name: i for i, (name, _value) in enumerate(current.env)}
         for kind, items in (
@@ -55,29 +56,41 @@ class LaunchOptionsBuilder(Adw.Dialog):
         preview_box.append(preview_title)
         preview_box.append(self.preview)
 
-        page = Adw.PreferencesPage()
-        for category in lo.CATEGORIES:
-            group = self._build_category(category)
-            if group:
-                page.add(group)
-        page.add(self._build_own(current))
+        self.page = Adw.PreferencesPage()
+        self.category_groups = []
+        self.own_group = self._build_own(current)
+        self._fill_page()
 
         cancel = Gtk.Button(label="Cancel")
         cancel.connect("clicked", lambda *_: self.close())
         use = Gtk.Button(label="Use")
         use.add_css_class("suggested-action")
         use.connect("clicked", self._on_use)
+        add = Gtk.Button(icon_name="list-add-symbolic", tooltip_text="Add Setting")
+        add.connect("clicked", lambda *_: self._open_add())
         header = Adw.HeaderBar(show_start_title_buttons=False, show_end_title_buttons=False)
         header.pack_start(cancel)
         header.pack_end(use)
+        header.pack_end(add)
 
-        toolbar = Adw.ToolbarView(content=page, top_bar_style=Adw.ToolbarStyle.RAISED)
+        toolbar = Adw.ToolbarView(content=self.page, top_bar_style=Adw.ToolbarStyle.RAISED)
         toolbar.add_top_bar(header)
         toolbar.add_top_bar(preview_box)
         self.set_child(toolbar)
         self._update_preview()
 
     # Rows ------------------------------------------------------------------
+
+    def _fill_page(self):
+        """(Re)build the setting rows, keeping Your Own and its text at the end."""
+        for group in self.category_groups:
+            self.page.remove(group)
+        if self.own_group.get_parent():
+            self.page.remove(self.own_group)
+        self.category_groups = [g for g in map(self._build_category, lo.CATEGORIES) if g]
+        for group in self.category_groups:
+            self.page.add(group)
+        self.page.add(self.own_group)
 
     def _build_category(self, category):
         settings = [s for s in self.settings.values() if s.category == category]
@@ -106,6 +119,7 @@ class LaunchOptionsBuilder(Adw.Dialog):
         if not (setting.takes_value or (setting.kind == lo.ENV and state["value"] != "1")):
             row = Adw.SwitchRow(title=title, subtitle=self._subtitle(setting), active=state["enabled"])
             row.connect("notify::active", lambda r, _p: self._set(key, enabled=r.get_active()))
+            self._add_remove_button(row, setting)
             return row
 
         row = Adw.ExpanderRow(
@@ -119,7 +133,16 @@ class LaunchOptionsBuilder(Adw.Dialog):
         if len(values) > 1 or (values and values[0] != state["value"]):
             entry.add_suffix(self._values_button(entry, values))
         row.add_row(entry)
+        self._add_remove_button(row, setting)
         return row
+
+    def _add_remove_button(self, row, setting):
+        if not setting.custom:
+            return
+        button = Gtk.Button(icon_name="user-trash-symbolic", tooltip_text="Remove from Builder", valign=Gtk.Align.CENTER)
+        button.add_css_class("flat")
+        button.connect("clicked", lambda *_: self._remove(setting))
+        row.add_suffix(button)
 
     def _values_button(self, entry, values):
         """A menu of the values the user's games use, which fills the entry."""
@@ -147,8 +170,16 @@ class LaunchOptionsBuilder(Adw.Dialog):
     def _build_own(self, current):
         group = Adw.PreferencesGroup(
             title="Your Own",
-            description="Anything else, typed as it would appear in Steam's launch options.",
+            description=(
+                "Anything else, typed as it would appear in Steam's launch options. To switch "
+                "a setting on and off here for every game, add it with Add Setting."
+            ),
         )
+        add = Gtk.Button(child=Adw.ButtonContent(icon_name="list-add-symbolic", label="Add Setting"),
+                         valign=Gtk.Align.CENTER)
+        add.add_css_class("flat")
+        add.connect("clicked", lambda *_: self._open_add())
+        group.set_header_suffix(add)
         self.extra_env = Adw.EntryRow(title="Extra Variables, such as NAME=value")
         self.extra_commands = Adw.EntryRow(title="Other Commands Before %command%", text=" ".join(current.other))
         self.extra_arguments = Adw.EntryRow(title="Extra Game Arguments")
@@ -156,6 +187,38 @@ class LaunchOptionsBuilder(Adw.Dialog):
             row.connect("changed", lambda *_: self._update_preview())
             group.add(row)
         return group
+
+    # Adding and removing settings ------------------------------------------
+
+    def _open_add(self):
+        dialog = AddLaunchSettingDialog(self.settings.keys())
+        dialog.connect("added", lambda _d, custom: self._on_added(custom))
+        dialog.present(self)
+
+    def _on_added(self, custom):
+        key = (custom.kind, custom.key)
+        setting = lo.setting_for(custom.kind, custom.key)
+        old = self.settings.get(key)
+        if old:  # Keep what the user's games already use.
+            setting.values, setting.games = old.values, old.games
+        self.settings[key] = setting
+        self.state[key] = {"enabled": True, "value": setting.common_value}
+        self._fill_page()
+        self._update_preview()
+
+    def _remove(self, setting):
+        key = (setting.kind, setting.key)
+        lo.remove_custom(*key)
+        if setting.games or self.state[key]["enabled"]:
+            # Still used, so it stays, described as Superlion would without the user's entry.
+            replacement = lo.setting_for(*key, custom={})
+            replacement.values, replacement.games = setting.values, setting.games
+            self.settings[key] = replacement
+        else:
+            del self.settings[key]
+            del self.state[key]
+        self._fill_page()
+        self._update_preview()
 
     # State -----------------------------------------------------------------
 
