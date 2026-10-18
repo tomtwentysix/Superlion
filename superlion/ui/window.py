@@ -867,6 +867,55 @@ class SuperlionWindow(Adw.ApplicationWindow):
             self.library.refresh_sidebar()
         self.update_pending()
 
+    def apply_game_settings(self, appid, changes, on_applied=None, parent=None):
+        """Save a game's settings to Steam, asking first when Steam must be closed.
+
+        on_applied(changes) runs once they are saved or queued for when Steam closes.
+        """
+        if not steam_control.is_running(self.config):
+            # Queue first so older queued values for this game cannot overwrite these.
+            pending.add(appid, changes)
+            try:
+                pending.apply_now(self.config)
+            except OSError as error:
+                self.toast(f"The settings could not be saved: {error.strerror}")
+                self.update_pending()
+                return
+            if on_applied:
+                on_applied(changes)
+            self.update_pending()
+            self.toast("Settings saved")
+            return
+
+        dialog = Adw.AlertDialog(
+            heading="Steam Must Be Closed",
+            body=(
+                "Steam keeps these settings in memory and overwrites any changes made "
+                "while it is running. Relaunch Steam now to apply them, or have them "
+                "applied automatically when Steam next closes."
+            ),
+        )
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("later", "Apply When Steam Closes")
+        dialog.add_response("relaunch", "Relaunch Steam Now")
+        dialog.set_response_appearance("relaunch", Adw.ResponseAppearance.SUGGESTED)
+        dialog.set_default_response("relaunch")
+        dialog.set_close_response("cancel")
+
+        def on_response(_dialog, response):
+            if response == "cancel":
+                return
+            pending.add(appid, changes)
+            if on_applied:
+                on_applied(changes)
+            if response == "relaunch":
+                self.relaunch_steam()
+            else:
+                self.update_pending()
+
+        dialog.connect("response", on_response)
+        dialog.present(parent or self)
+
     def relaunch_steam(self):
         if self._relaunching:
             return

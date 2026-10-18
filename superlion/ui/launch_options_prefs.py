@@ -1,6 +1,6 @@
 """The Launch Options page of Preferences: presets, added settings, and games' launch options."""
 
-from gi.repository import Adw, GLib, Gtk, Pango
+from gi.repository import Adw, GLib, Gtk
 
 from .. import launch_options as lo
 from .. import launch_presets
@@ -10,14 +10,21 @@ from .launch_options_editor import LaunchOptionsEditor
 PAGE_NAME = "launch-options"
 
 
-def _options_row(title, options):
+def _options_row(title, options, on_activate):
+    """A row naming the settings in some launch options in full; it opens them in the editor."""
     row = Adw.ActionRow(
         title=GLib.markup_escape_text(title),
-        subtitle=GLib.markup_escape_text(options),
-        subtitle_lines=2,
+        subtitle=GLib.markup_escape_text(lo.summary(options)),
+        subtitle_lines=0,
+        activatable=True,
+        tooltip_text=options,
     )
-    row.add_css_class("property")
+    row.connect("activated", lambda *_: on_activate())
     return row
+
+
+def _go_next(row):
+    row.add_suffix(Gtk.Image(icon_name="go-next-symbolic"))
 
 
 def _icon_button(icon, tooltip, callback):
@@ -57,9 +64,9 @@ class LaunchOptionsPage(Adw.PreferencesPage):
                 subtitle="Create one, or save a game's launch options as a preset below.",
             ))
         for preset in presets:
-            row = _options_row(preset.name, preset.options)
-            row.add_suffix(_icon_button("document-edit-symbolic", "Edit", lambda p=preset: self._edit_preset(p)))
+            row = _options_row(preset.name, preset.options, lambda p=preset: self._edit_preset(p))
             row.add_suffix(_icon_button("user-trash-symbolic", "Delete", lambda p=preset: self._confirm_delete(p)))
+            _go_next(row)
             group.add(row)
         return group
 
@@ -139,30 +146,33 @@ class LaunchOptionsPage(Adw.PreferencesPage):
     def _build_games(self):
         group = Adw.PreferencesGroup(
             title="Your Games",
-            description="Launch options set for your games. Any of them can be saved as a preset.",
+            description="Launch options set for your games. Choose one to change it, or to save it as a preset.",
         )
         config = self.window.config
         configured = launch_presets.configured_games(config) if config else {}
         entries = sorted(
-            ((self._game_name(appid), options) for appid, options in configured.items()),
-            key=lambda entry: entry[0].casefold(),
+            ((appid, self._game_name(appid), options) for appid, options in configured.items()),
+            key=lambda entry: entry[1].casefold(),
         )
         if not entries:
             group.add(Adw.ActionRow(title="No games have launch options set."))
-        for name, options in entries:
-            row = _options_row(name, options)
+        for appid, name, options in entries:
+            row = _options_row(name, options, lambda a=appid, n=name, o=options: self._edit_game(a, n, o))
             existing = launch_presets.find_by_options(options)
             if existing:
-                saved = Gtk.Label(label=f"Saved as “{existing.name}”", valign=Gtk.Align.CENTER,
-                                  ellipsize=Pango.EllipsizeMode.END, max_width_chars=18)
+                saved = Gtk.Image(icon_name="emblem-ok-symbolic", tooltip_text=f"Saved as preset “{existing.name}”")
                 saved.add_css_class("dim-label")
                 row.add_suffix(saved)
             else:
-                button = Gtk.Button(label="Save as Preset", valign=Gtk.Align.CENTER)
-                button.connect("clicked", lambda *_, n=name, o=options: self._new_preset(o, n))
-                row.add_suffix(button)
+                row.add_suffix(_icon_button(
+                    "document-save-symbolic", "Save as Preset", lambda n=name, o=options: self._new_preset(o, n)
+                ))
+            _go_next(row)
             group.add(row)
         return group
+
+    def _edit_game(self, appid, name, options):
+        self._open_editor(LaunchOptionsEditor(self.window, options, game_name=name, appid=appid))
 
     def _game_name(self, appid):
         game = self.window.find_game(appid)

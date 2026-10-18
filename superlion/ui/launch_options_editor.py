@@ -58,9 +58,10 @@ class LaunchOptionsEditor(Adw.Dialog):
 
     __gsignals__ = {"done": (GObject.SignalFlags.RUN_FIRST, None, (str,))}
 
-    def __init__(self, window, options="", game_name="", preset=None, new_preset=False):
+    def __init__(self, window, options="", game_name="", preset=None, new_preset=False, appid=None):
         self.window = window
         self.game_name = game_name
+        self.appid = appid  # When set, Save writes the launch options to Steam for this game.
         self.preset = preset
         self.for_preset = preset is not None or new_preset
         if self.for_preset:
@@ -87,7 +88,7 @@ class LaunchOptionsEditor(Adw.Dialog):
 
         cancel = Gtk.Button(label="Cancel")
         cancel.connect("clicked", lambda *_: self.close())
-        self.done_button = Gtk.Button(label="Save" if self.for_preset else "Done")
+        self.done_button = Gtk.Button(label="Save" if self.for_preset or appid is not None else "Done")
         self.done_button.add_css_class("suggested-action")
         self.done_button.connect("clicked", lambda *_: self._on_done())
         add = Gtk.Button(icon_name="list-add-symbolic", tooltip_text="Add Setting")
@@ -444,5 +445,12 @@ class LaunchOptionsEditor(Adw.Dialog):
                 launch_presets.update(self.preset.id, name, options)
             else:
                 launch_presets.add(name, options)
+        elif self.appid is not None:
+            def saved(_changes):
+                self.emit("done", options)
+                self.close()
+
+            self.window.apply_game_settings(self.appid, {"launch_options": options}, saved, parent=self)
+            return
         self.emit("done", options)
         self.close()
