@@ -23,6 +23,13 @@ CATEGORY_DESCRIPTIONS = {
 }
 
 
+WARNING_LABELS = {lo.NOT_NEEDED: "Not needed", lo.BREAKS: "Causes problems"}
+
+
+def describe_warning(warning):
+    return f"{WARNING_LABELS[warning.kind]}: {warning.text}"
+
+
 def _usage(setting):
     if setting.games == 0:
         return "Not used in your games yet"
@@ -80,6 +87,8 @@ class LaunchOptionsEditor(Adw.Dialog):
         self.order = {}
         self.other = []
         self.rows = {}
+        self.warning_icons = {}
+        self.warning_rows = []
         self._syncing = False
         self._parse_timer = 0
 
@@ -87,6 +96,7 @@ class LaunchOptionsEditor(Adw.Dialog):
         self.page = Adw.PreferencesPage()
         self.category_groups = []
         self.top_group = self._build_top_group(options)
+        self.warning_group = Adw.PreferencesGroup(title="Warnings")
         self.toasts.set_child(self.page)
 
         cancel = Gtk.Button(label="Cancel")
@@ -202,6 +212,7 @@ class LaunchOptionsEditor(Adw.Dialog):
             self._fill_page()
         else:
             self._refresh_rows()
+            self._update_warnings()
 
     def _write_text(self):
         """Rewrite the text from the settings switched on."""
@@ -217,6 +228,7 @@ class LaunchOptionsEditor(Adw.Dialog):
             else:
                 arguments.append(setting.key)
         self._set_text(lo.compose(env, wrappers, self.other, arguments))
+        self._update_warnings()
 
     def _ordered_settings(self):
         return sorted(
@@ -225,12 +237,14 @@ class LaunchOptionsEditor(Adw.Dialog):
         )
 
     def _fill_page(self):
-        for group in [self.top_group, *self.category_groups]:
+        for group in [self.top_group, self.warning_group, *self.category_groups]:
             if group.get_parent():
                 self.page.remove(group)
         self.rows = {}
+        self.warning_icons = {}
         self.searchable = []  # (group, [(row, text to search)])
         self.page.add(self.top_group)
+        self.page.add(self.warning_group)
         self.category_groups = []
         for category in lo.CATEGORIES:
             settings = [s for s in self._ordered_settings() if s.category == category]
@@ -252,6 +266,7 @@ class LaunchOptionsEditor(Adw.Dialog):
         self.category_groups.append(more)
         for group in self.category_groups:
             self.page.add(group)
+        self._update_warnings()
         self._apply_search()
 
     def _apply_search(self):
@@ -265,6 +280,37 @@ class LaunchOptionsEditor(Adw.Dialog):
                 shown += visible
             group.set_visible(bool(shown))
         self.top_group.set_visible(not words)
+        self.warning_group.set_visible(not words and bool(self.warning_rows))
+
+    def _update_warnings(self):
+        """List the launch options' warnings, and mark the settings they are about."""
+        for row in self.warning_rows:
+            self.warning_group.remove(row)
+        self.warning_rows = []
+        found = lo.warnings(self.text())
+        for icon in self.warning_icons.values():
+            icon.set_visible(False)
+        for warning in found:
+            setting = self.settings.get(warning.key) or lo.setting_for(*warning.key)
+            row = Adw.ActionRow(
+                title=GLib.markup_escape_text(setting.title),
+                subtitle=GLib.markup_escape_text(describe_warning(warning)),
+            )
+            icon = Gtk.Image(icon_name="dialog-warning-symbolic")
+            icon.add_css_class("warning")
+            row.add_prefix(icon)
+            target = self.rows.get(warning.key)
+            if target:
+                row.set_activatable(True)
+                row.add_suffix(Gtk.Image(icon_name="go-next-symbolic"))
+                row.connect("activated", lambda _r, t=target[0]: t.grab_focus())
+            self.warning_group.add(row)
+            self.warning_rows.append(row)
+            icon = self.warning_icons.get(warning.key)
+            if icon:
+                icon.set_visible(True)
+                icon.set_tooltip_text(describe_warning(warning))
+        self.warning_group.set_visible(bool(found) and not self.search.get_text().split())
 
     def _subtitle(self, setting):
         parts = [setting.description, _usage(setting)]
@@ -279,6 +325,7 @@ class LaunchOptionsEditor(Adw.Dialog):
         if not (setting.takes_value or (setting.kind == lo.ENV and state["value"] != "1")):
             row = Adw.SwitchRow(title=title, subtitle=self._subtitle(setting), active=state["enabled"])
             row.connect("notify::active", lambda r, _p: self._on_row_changed(key, enabled=r.get_active()))
+            self._add_warning_icon(row, key)
             self._add_remove_button(row, setting)
             self.rows[key] = (row, None)
             return row
@@ -296,9 +343,16 @@ class LaunchOptionsEditor(Adw.Dialog):
         if len(values) > 1 or (values and values[0] != state["value"]):
             entry.add_suffix(self._values_button(entry, values))
         row.add_row(entry)
+        self._add_warning_icon(row, key)
         self._add_remove_button(row, setting)
         self.rows[key] = (row, entry)
         return row
+
+    def _add_warning_icon(self, row, key):
+        icon = Gtk.Image(icon_name="dialog-warning-symbolic", visible=False)
+        icon.add_css_class("warning")
+        row.add_suffix(icon)
+        self.warning_icons[key] = icon
 
     def _refresh_rows(self):
         self._syncing = True
