@@ -4,6 +4,7 @@ from gi.repository import Adw, Gio, GLib, Gtk
 
 from .. import auth, downloads, library, mod_managers, owned, pending, steam_control, steam_settings, store_api
 from . import images
+from .. import launch_options as lo
 from .launch_options_editor import LaunchOptionsEditor
 from .library_view import collections_popover
 from .downloads_view import describe
@@ -497,7 +498,7 @@ class GameDetailsPage(Adw.NavigationPage):
         self._update_settings_description()
 
         self.launch_options = self.loaded["launch_options"]
-        self.options_row = Adw.ActionRow(title="Launch Options", activatable=True, subtitle_lines=3)
+        self.options_row = Adw.ActionRow(title="Launch Options", activatable=True, subtitle_lines=0)
         self.options_row.add_suffix(Gtk.Image(icon_name="go-next-symbolic"))
         self.options_row.connect("activated", lambda *_: self._edit_launch_options())
         self.settings_group.add(self.options_row)
@@ -519,8 +520,12 @@ class GameDetailsPage(Adw.NavigationPage):
         return self.settings_group
 
     def _show_launch_options(self):
-        text = self.launch_options or "None. Choose to build them, or to use a preset."
+        if self.launch_options:
+            text = lo.summary(self.launch_options)
+        else:
+            text = "None. Choose to set them up, or to use a preset."
         self.options_row.set_subtitle(GLib.markup_escape_text(text))
+        self.options_row.set_tooltip_text(self.launch_options or None)
 
     def _edit_launch_options(self):
         editor = LaunchOptionsEditor(self.window, self.launch_options, game_name=self.game.props.name)
@@ -555,49 +560,8 @@ class GameDetailsPage(Adw.NavigationPage):
 
     def _on_apply(self, _row):
         changes = self._changed_settings()
-        if not changes:
-            return
-        config = self.window.config
-        if not steam_control.is_running(config):
-            # Queue first so older queued values for this game cannot overwrite these.
-            pending.add(self.game.props.appid, changes)
-            try:
-                pending.apply_now(config)
-            except OSError as error:
-                self.window.toast(f"The settings could not be saved: {error.strerror}")
-                self.window.update_pending()
-                return
-            self._mark_applied(changes)
-            self.window.update_pending()
-            self.window.toast("Settings saved")
-            return
-
-        dialog = Adw.AlertDialog(
-            heading="Steam Must Be Closed",
-            body=(
-                "Steam keeps these settings in memory and overwrites any changes made "
-                "while it is running. Relaunch Steam now to apply them, or have them "
-                "applied automatically when Steam next closes."
-            ),
-        )
-        dialog.add_response("cancel", "Cancel")
-        dialog.add_response("later", "Apply When Steam Closes")
-        dialog.add_response("relaunch", "Relaunch Steam Now")
-        dialog.set_response_appearance("relaunch", Adw.ResponseAppearance.SUGGESTED)
-        dialog.set_default_response("relaunch")
-        dialog.set_close_response("cancel")
-        dialog.connect("response", self._on_apply_response, changes)
-        dialog.present(self.window)
-
-    def _on_apply_response(self, _dialog, response, changes):
-        if response == "cancel":
-            return
-        pending.add(self.game.props.appid, changes)
-        self._mark_applied(changes)
-        if response == "relaunch":
-            self.window.relaunch_steam()
-        else:
-            self.window.update_pending()
+        if changes:
+            self.window.apply_game_settings(self.game.props.appid, changes, self._mark_applied)
 
     def _mark_applied(self, changes):
         self.loaded.update(changes)

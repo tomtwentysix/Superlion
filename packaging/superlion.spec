@@ -1,5 +1,5 @@
 Name:           superlion
-Version:        0.7
+Version:        0.7.1
 Release:        1%{?dist}
 Summary:        Native GNOME front end for your Steam library
 License:        GPL-3.0-or-later
@@ -62,6 +62,10 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/uk.co.solarflareit.Su
 %{_datadir}/icons/hicolor/*/apps/uk.co.solarflareit.Superlion*
 
 %changelog
+* Sun Oct 18 2026 Tom <tom@solarflareit.co.uk> - 0.7.1-1
+- Show launch options by setting name instead of truncated text, and open them in the editor from Preferences.
+- Split the Steam Account preferences into Steam API and Steam Store.
+
 * Sun Oct 18 2026 Tom <tom@solarflareit.co.uk> - 0.7-1
 - Bring launch options together: one editor for typing and switching settings, with presets, and a Launch Options tab in Preferences.
 

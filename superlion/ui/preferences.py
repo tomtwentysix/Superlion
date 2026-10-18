@@ -28,8 +28,9 @@ class PreferencesDialog(Adw.PreferencesDialog):
 
         accounts = Adw.PreferencesPage(title="Accounts", icon_name="system-users-symbolic")
         self.region = region_choice(accounts.add, self.state)
-        self.sign_in_group = Adw.PreferencesGroup(title="Steam Account")
+        self.sign_in_group = Adw.PreferencesGroup(title="Steam API")
         accounts.add(self.sign_in_group)
+        accounts.add(self._build_store_group())
         self.sgdb_group = Adw.PreferencesGroup(title="SteamGridDB")
         accounts.add(self.sgdb_group)
         setup_group = Adw.PreferencesGroup(title="Setup")
@@ -73,19 +74,21 @@ class PreferencesDialog(Adw.PreferencesDialog):
             button.connect("clicked", lambda *_: self._connect())
             row.add_suffix(button)
         rows.append(row)
-
-        website = Adw.ActionRow(
-            title="Steam Website",
-            subtitle="The sign-in used by the store and key page inside Superlion.",
-        )
-        sign_out = Gtk.Button(label="Sign Out of Website", valign=Gtk.Align.CENTER)
-        sign_out.connect("clicked", lambda *_: (clear_sign_in(), self.window.toast("Signed out of the Steam website")))
-        website.add_suffix(sign_out)
-        rows.append(website)
-
         for row in rows:
             self.sign_in_group.add(row)
         self._sign_in_rows = rows
+
+    def _build_store_group(self):
+        group = Adw.PreferencesGroup(title="Steam Store")
+        website = Adw.ActionRow(
+            title="Store Sign-In",
+            subtitle="Used for buying, the cart and the wishlist, and by the key page inside Superlion.",
+        )
+        sign_out = Gtk.Button(label="Sign Out", valign=Gtk.Align.CENTER)
+        sign_out.connect("clicked", lambda *_: (clear_sign_in(), self.window.toast("Signed out of the Steam store")))
+        website.add_suffix(sign_out)
+        group.add(website)
+        return group
 
     def _connect(self):
         dialog = self.window.sign_in(parent=self)

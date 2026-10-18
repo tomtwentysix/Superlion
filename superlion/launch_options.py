@@ -390,3 +390,27 @@ def custom_programs(custom=None):
     """Names of programs the user added, for parse()."""
     custom = custom if custom is not None else custom_settings()
     return {key for kind, key in custom if kind == WRAPPER}
+
+
+SHORT_VALUE = 20  # Longer values are left out of summaries.
+
+
+def summary(options, custom=None):
+    """Launch options described by setting name, such as "GameMode, Wayland, DLSS Preset (render_preset_m)"."""
+    custom = custom if custom is not None else custom_settings()
+    parsed = parse(options, custom_programs(custom))
+    items = (
+        [(setting_for(WRAPPER, name, custom), "") for name in parsed.wrappers]
+        + [(setting_for(ENV, name, custom), value) for name, value in parsed.env]
+        + [(setting_for(ARGUMENT, argument, custom), "") for argument in parsed.arguments]
+    )
+    items.sort(key=lambda item: CATEGORIES.index(item[0].category) if item[0].category in CATEGORIES else len(CATEGORIES))
+    parts = []
+    for setting, value in items:
+        value = value.strip("\"'")
+        if setting.kind == ENV and value not in ("", "1") and len(value) <= SHORT_VALUE:
+            parts.append(f"{setting.title}: {value}")
+        else:
+            parts.append(setting.title)
+    parts += parsed.other
+    return ", ".join(parts) if parts else "None"
