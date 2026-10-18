@@ -1,6 +1,6 @@
 Name:           superlion
 Version:        0.7.4
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Native GNOME front end for your Steam library
 License:        GPL-3.0-or-later
 Vendor:         SolarFlare Developments
@@ -54,6 +54,7 @@ done
 desktop-file-validate %{buildroot}%{_datadir}/applications/uk.co.solarflareit.Superlion.desktop
 
 %files
+%license LICENSE
 %doc README.md
 %{_bindir}/superlion
 %{_datadir}/%{name}/
@@ -62,6 +63,9 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/uk.co.solarflareit.Su
 %{_datadir}/icons/hicolor/*/apps/uk.co.solarflareit.Superlion*
 
 %changelog
+* Sun Oct 18 2026 Tom <tom@solarflareit.co.uk> - 0.7.4-2
+- Include the licence text in the package.
+
 * Sun Oct 18 2026 Tom <tom@solarflareit.co.uk> - 0.7.4-1
 - Use a floppy disk icon for Save as Preset, and a tick for games already saved as a preset.
 

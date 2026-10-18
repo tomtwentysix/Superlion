@@ -106,8 +106,6 @@ class LaunchOptionsEditor(Adw.Dialog):
         self._read_text(options, rebuild=True)
         self.connect("closed", lambda *_: self._parse_timer and GLib.source_remove(self._parse_timer))
 
-    # Text ------------------------------------------------------------------
-
     def _build_text_area(self, options):
         self.buffer = Gtk.TextBuffer(text=options)
         self.buffer.connect("changed", self._on_text_changed)
@@ -213,8 +211,6 @@ class LaunchOptionsEditor(Adw.Dialog):
             else:
                 arguments.append(setting.key)
         self._set_text(lo.compose(env, wrappers, self.other, arguments))
-
-    # Rows ------------------------------------------------------------------
 
     def _ordered_settings(self):
         return sorted(
@@ -333,8 +329,6 @@ class LaunchOptionsEditor(Adw.Dialog):
         button.add_css_class("flat")
         return button
 
-    # Presets ---------------------------------------------------------------
-
     def _build_top_group(self, options):
         if self.for_preset:
             group = Adw.PreferencesGroup(title="Preset")
@@ -400,8 +394,6 @@ class LaunchOptionsEditor(Adw.Dialog):
     def _validate_preset(self):
         self.done_button.set_sensitive(bool(self.name_row.get_text().strip() and self.text()))
 
-    # Adding and removing settings ------------------------------------------
-
     def _open_add(self):
         dialog = AddLaunchSettingDialog(self.settings.keys())
         dialog.connect("added", lambda _d, custom: self._on_added(custom))
@@ -432,8 +424,6 @@ class LaunchOptionsEditor(Adw.Dialog):
             del self.settings[key]
             del self.state[key]
         self._fill_page()
-
-    # Finishing -------------------------------------------------------------
 
     def _on_done(self):
         options = self.text()

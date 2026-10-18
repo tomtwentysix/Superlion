@@ -27,7 +27,7 @@ PYTHON
 # Source archive of the files the package needs, without caches.
 stage="$work/superlion-$version"
 mkdir -p "$stage"
-cp -a "$project/superlion" "$project/data" "$project/packaging" "$project/README.md" "$stage/"
+cp -a "$project/superlion" "$project/data" "$project/packaging" "$project/README.md" "$project/LICENSE" "$stage/"
 find "$stage" -name __pycache__ -type d -prune -exec rm -rf {} +
 tar -C "$work" -czf "$top/SOURCES/superlion-$version.tar.gz" "superlion-$version"
 cp "$project/packaging/superlion.spec" "$top/SPECS/"
