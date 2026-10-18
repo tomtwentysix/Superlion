@@ -52,10 +52,10 @@ Superlion is dedicated to the memory of John Wharton of S J Wharton Ltd (1953–
 
 ## Installing
 
-On Fedora, add the Superlion repository, which is built on [COPR](https://copr.fedorainfracloud.org/coprs/solartw/superlion/). Updates then arrive with your other system updates.
+On Fedora, install from [COPR](https://copr.fedorainfracloud.org/coprs/solartw/superlion/). Updates then arrive with your other system updates.
 
 ```bash
-sudo dnf config-manager addrepo --from-repofile=https://raw.githubusercontent.com/tomtwentysix/Superlion/main/packaging/superlion.repo
+sudo dnf copr enable solartw/superlion
 ```
 
 ```bash
