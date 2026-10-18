@@ -79,10 +79,56 @@ def unique_name(name):
     return candidate
 
 
+# Recognised parts of launch options and the names used for them, checked in
+# order. Keys ending in "=" or "_" match variables by prefix; others match a whole
+# word (the program name, without its folder) or a game argument, ignoring case.
+KNOWN_PARTS = [
+    ("gamemoderun", "GameMode"),
+    ("gamescope", "Gamescope"),
+    ("mangohud", "MangoHud"),
+    ("MANGOHUD=", "MangoHud"),
+    ("obs-gamecapture", "OBS Capture"),
+    ("prime-run", "NVIDIA PRIME"),
+    ("PRESSURE_VESSEL_IMPORT_OPENXR_", "VR"),
+    ("PROTON_ENABLE_NVAPI=", "NVAPI"),
+    ("PROTON_ENABLE_WAYLAND=", "Wayland"),
+    ("PROTON_ENABLE_HDR=", "HDR"),
+    ("DXVK_HDR=", "HDR"),
+    ("--hdr-enabled", "HDR"),
+    ("PROTON_USE_WINED3D=", "WineD3D"),
+    ("PROTON_LOG=", "Proton Log"),
+    ("WINEDLLOVERRIDES=", "DLL Overrides"),
+    ("-dx11", "DirectX 11"),
+    ("-dx12", "DirectX 12"),
+    ("-vulkan", "Vulkan"),
+    ("--launcher-skip", "Skip Launcher"),
+    ("-skipintro", "Skip Intro"),
+]
+MAX_NAME_PARTS = 3
+
+
 def suggest_name(options, game_name):
-    """A default name for a preset made from a game's launch options."""
-    # TODO(human): name the preset after what the options do, falling back to the game.
-    return f"{game_name} Options"
+    """A default name for a preset made from a game's launch options.
+
+    Names what the options do, such as "GameMode + MangoHud", from the parts it
+    recognises; otherwise names it after the game it came from.
+    """
+    words = options.split()
+    parts = []
+    for key, label in KNOWN_PARTS:
+        if key.endswith(("=", "_")):
+            # A variable set to 0 or nothing turns the feature off rather than on.
+            found = any(
+                word.upper().startswith(key) and word.partition("=")[2].strip("\"'") not in ("", "0")
+                for word in words
+            )
+        else:
+            found = any(word.rsplit("/", 1)[-1].casefold() == key.casefold() for word in words)
+        if found and label not in parts:
+            parts.append(label)
+    if not parts:
+        return f"{game_name} Options"
+    return " + ".join(parts[:MAX_NAME_PARTS])
 
 
 def configured_games(config):
