@@ -51,6 +51,9 @@ Superlion is dedicated to the memory of John Wharton of S J Wharton Ltd (1953–
 - Native store browsing, search and game pages, with prices in your Steam profile's country (or the United Kingdom's when it shows none).
 - Buying, the cart and the wishlist open Steam's web pages inside the app.
 
+### Steam in the background
+- Superlion starts Steam hidden when it opens, and whenever it starts or restarts Steam, so games, downloads and installs work without Steam's window appearing. Steam's window only opens for its own pages, such as **Open Downloads in Steam**. Turn this off in **Preferences → Steam → Start Steam With Superlion**.
+
 ## Installing
 
 On Fedora, install from [COPR](https://copr.fedorainfracloud.org/coprs/solartw/superlion/). Updates then arrive with your other system updates.

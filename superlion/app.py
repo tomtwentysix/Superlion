@@ -10,12 +10,13 @@ gi.require_version("Adw", "1")
 from gi.repository import Adw, Gdk, Gio, Gtk  # noqa: E402
 
 from . import config as config_mod  # noqa: E402
+from . import steam_control  # noqa: E402
 from .ui.dedication import COMPANY, DEDICATION, KNOWN_FOR, NAME, TRIBUTE, YEARS  # noqa: E402
 
 PACKAGE_DIR = Path(__file__).parent
 # The interface's own icons, and the application icon kept with the project data.
 ICON_DIRS = (PACKAGE_DIR / "icons", PACKAGE_DIR.parent / "data" / "icons")
-VERSION = "0.8"
+VERSION = "0.9"
 DEVELOPER = "SolarFlare Developments"
 
 
@@ -53,6 +54,8 @@ class SuperlionApplication(Adw.Application):
             window.present()
             if config is None:
                 window.run_setup(first_run=True)
+            elif config.start_steam and not config.problems():
+                steam_control.start_if_needed(config)
         window.present()
 
     def _on_preferences(self, *_):

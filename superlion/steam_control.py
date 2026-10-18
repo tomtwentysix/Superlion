@@ -56,21 +56,42 @@ def _spawn(config, *args):
     Gio.Subprocess.new(shlex.split(config.steam_command) + list(args), Gio.SubprocessFlags.NONE)
 
 
+# Links that do their work without Steam's window, such as starting a game.
+BACKGROUND_LINKS = ("steam://rungameid/", "steam://run/", "steam://launch/")
+
+
 def open_uri(config, uri):
     """Open a steam:// link in the Steam client the user selected.
 
-    With a single Steam installed the desktop's default handler is used. When both
-    native and Flatpak Steam are present, the default handler may belong to the
-    other one, so the link is passed to the configured command instead.
+    If Steam is not running, it is started with the link, hidden unless the link
+    is for one of Steam's own pages. With a single Steam installed the desktop's
+    default handler is used otherwise. When both native and Flatpak Steam are
+    present, the default handler may belong to the other one, so the link is
+    passed to the configured command instead.
     """
-    if len(steam_paths.command_candidates()) > 1:
+    if not is_running(config):
+        if uri.startswith(BACKGROUND_LINKS):
+            _spawn(config, "-silent", uri)
+        else:
+            _spawn(config, uri)
+    elif len(steam_paths.command_candidates()) > 1:
         _spawn(config, uri)
     else:
         Gio.AppInfo.launch_default_for_uri(uri, None)
 
 
 def start(config):
-    _spawn(config)
+    """Start Steam without showing its window."""
+    if not config_mod.SCREENSHOTS:
+        _spawn(config, "-silent")
+
+
+def start_if_needed(config):
+    """Start Steam hidden if it is not running; True if it was started."""
+    if is_running(config):
+        return False
+    start(config)
+    return True
 
 
 def shutdown(config, callback):
