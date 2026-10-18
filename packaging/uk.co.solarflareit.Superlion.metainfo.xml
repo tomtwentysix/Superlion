@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>uk.co.solarflareit.Superlion</id>
+  <name>Superlion</name>
+  <summary>Browse, launch and manage your Steam games</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <description>
+    <p>
+      A native GNOME front end for your Steam library: installed and owned games, non-Steam
+      games, collections, mod managers, downloads, artwork from SteamGridDB and a built-in store.
+    </p>
+    <p>Dedicated to the memory of John Wharton of S J Wharton Ltd (1953–2026).</p>
+  </description>
+  <launchable type="desktop-id">uk.co.solarflareit.Superlion.desktop</launchable>
+  <developer id="uk.co.solarflareit">
+    <name>SolarFlare Developments</name>
+  </developer>
+  <content_rating type="oars-1.1"/>
+</component>

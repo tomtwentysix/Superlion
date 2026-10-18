@@ -1,0 +1,4 @@
+#!/bin/sh
+# Starts Superlion from its installed location.
+export PYTHONPATH="/usr/share/superlion${PYTHONPATH:+:$PYTHONPATH}"
+exec /usr/bin/python3 -m superlion "$@"

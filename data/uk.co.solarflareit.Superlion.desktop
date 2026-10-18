@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Superlion
+GenericName=Steam Library
+Comment=Browse, launch and manage your Steam games
+Exec=python3 -m superlion
+Path=/home/tom/Documents/Claude/Code/Superlion
+Icon=/home/tom/Documents/Claude/Code/Superlion/data/icons/uk.co.solarflareit.Superlion-512.png
+Terminal=false
+Categories=Game;GTK;
+Keywords=Steam;Games;Library;Proton;Store;
+StartupNotify=true
+DBusActivatable=false
