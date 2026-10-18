@@ -13,6 +13,8 @@ import os
 import re
 from collections import Counter
 from dataclasses import asdict, dataclass, field
+from functools import cache
+from pathlib import Path
 
 from . import config as config_mod
 
@@ -535,6 +537,105 @@ def _group_arguments(words):
         else:
             groups.append(word)
     return groups
+
+
+NOT_NEEDED, BREAKS = "not-needed", "breaks"
+
+# PCI vendor IDs, as in /sys/class/drm/card*/device/vendor.
+GRAPHICS_VENDORS = {"0x10de": "NVIDIA", "0x1002": "AMD", "0x8086": "Intel"}
+
+HDR_VARIABLES = ["DXVK_HDR", "PROTON_ENABLE_HDR", "ENABLE_HDR_WSI"]
+# Each setting, and the setting it undoes when both are on.
+OPPOSITES = {
+    "PROTON_DISABLE_NVAPI": "PROTON_ENABLE_NVAPI",
+    "DXVK_NO_HDR": "DXVK_HDR",
+    "DISABLE_HDR_WSI": "ENABLE_HDR_WSI",
+}
+
+
+@dataclass
+class LaunchWarning:
+    key: tuple  # (kind, key) of the setting it is about
+    kind: str  # NOT_NEEDED or BREAKS
+    text: str
+
+
+@cache
+def graphics_vendors():
+    """Makes of graphics card in this computer, such as {"NVIDIA"}; empty when unknown."""
+    found = set()
+    for path in Path("/sys/class/drm").glob("card*/device/vendor"):
+        try:
+            found.add(GRAPHICS_VENDORS.get(path.read_text().strip(), ""))
+        except OSError:
+            pass
+    return found - {""}
+
+
+@cache
+def nvidia_driver():
+    """The loaded NVIDIA driver's major version, or 0."""
+    try:
+        return int(Path("/sys/module/nvidia/version").read_text().split(".")[0])
+    except (OSError, ValueError):
+        return 0
+
+
+def _is_on(value):
+    return value.strip("\"'") not in ("", "0")
+
+
+def warnings(options, custom=None):
+    """Settings in the launch options that do nothing on this computer, or stop something else working."""
+    custom = custom if custom is not None else custom_settings()
+    parsed = parse(options, custom_programs(custom))
+    env = dict(parsed.env)
+    on = {name for name, value in env.items() if _is_on(value)}
+    found = []
+
+    def warn(name, kind, text, setting_kind=ENV):
+        found.append(LaunchWarning((setting_kind, name), kind, text))
+
+    def named(name):
+        title = setting_for(ENV, name, custom).title
+        return f"{title} ({name})" if title != name else name
+
+    for name, count in Counter(name for name, _value in parsed.env).items():
+        if count > 1:
+            warn(name, NOT_NEEDED, f"Set {count} times. Only the last value is used.")
+
+    vendors = graphics_vendors()
+    for kind, key in [(ENV, name) for name in env] + [(WRAPPER, name) for name in parsed.wrappers]:
+        category = setting_for(kind, key, custom).category
+        if category in ("NVIDIA", "AMD") and vendors and category not in vendors:
+            warn(key, NOT_NEEDED, f"No {category} graphics card was found.", kind)
+
+    if "WINE_DLL_OVERRIDES" in env:
+        warn("WINE_DLL_OVERRIDES", NOT_NEEDED, "Wine does not read this name. Use DLL Overrides (WINEDLLOVERRIDES).")
+    if env.get("PROTON_USE_PIPEWIRE") == "1":
+        warn("PROTON_USE_PIPEWIRE", NOT_NEEDED, "PipeWire audio is already the default.")
+
+    hdr_capable = "PROTON_ENABLE_WAYLAND" in on or "gamescope" in parsed.wrappers
+    for name in HDR_VARIABLES:
+        if name not in on:
+            continue
+        if not hdr_capable:
+            warn(name, NOT_NEEDED, "HDR only works with Wayland (PROTON_ENABLE_WAYLAND=1) or Gamescope.")
+        elif name == "ENABLE_HDR_WSI" and vendors == {"NVIDIA"} and nvidia_driver() >= 595:
+            warn(name, NOT_NEEDED, "NVIDIA drivers from 595 output HDR without this layer.")
+
+    for name, opposite in OPPOSITES.items():
+        if name in on and opposite in on:
+            warn(name, BREAKS, f"Undoes {named(opposite)}, which is also set.")
+
+    if "LD_PRELOAD" in env and not env["LD_PRELOAD"].strip("\"'"):
+        warn(
+            "LD_PRELOAD", BREAKS,
+            "Stops the Steam overlay and its screenshots. On Wayland, Steam Remote Play and Steam Link show no picture.",
+        )
+    if "PROTON_PREFER_SDL" in on:
+        warn("PROTON_PREFER_SDL", BREAKS, "Controller layouts set in Steam Input are not used.")
+    return found
 
 
 def quote(value):

@@ -5,7 +5,7 @@ from gi.repository import Adw, Gio, GLib, Gtk
 from .. import auth, downloads, library, mod_managers, owned, pending, steam_control, steam_settings, store_api
 from . import images
 from .. import launch_options as lo
-from .launch_options_editor import LaunchOptionsEditor
+from .launch_options_editor import LaunchOptionsEditor, describe_warning
 from .library_view import collections_popover
 from .downloads_view import describe
 from .media import MediaCarousel, description_widgets, news_group
@@ -54,6 +54,7 @@ class GameDetailsPage(Adw.NavigationPage):
             margin_end=12,
         )
         body.append(self._build_actions())
+        body.append(self._build_warnings_note())
         body.append(self._build_download_progress())
 
         overview = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=24)
@@ -519,6 +520,25 @@ class GameDetailsPage(Adw.NavigationPage):
         self.settings_group.add(self.apply_row)
         return self.settings_group
 
+    def _build_warnings_note(self):
+        self.warnings_label = Gtk.Label()
+        content = Gtk.Box(spacing=6)
+        content.append(Gtk.Image(icon_name="dialog-warning-symbolic"))
+        content.append(self.warnings_label)
+        self.warnings_note = Gtk.Button(child=content, halign=Gtk.Align.CENTER, visible=False)
+        self.warnings_note.add_css_class("flat")
+        self.warnings_note.add_css_class("warning")
+        self.warnings_note.connect("clicked", lambda *_: self._edit_launch_options())
+        return self.warnings_note
+
+    def _show_warnings(self):
+        found = lo.warnings(self.launch_options)
+        self.warnings_note.set_visible(bool(found))
+        if found:
+            count = len(found)
+            self.warnings_label.set_label(f"{count} launch option warning{'s' if count != 1 else ''}")
+            self.warnings_note.set_tooltip_text("\n".join(describe_warning(w) for w in found))
+
     def _show_launch_options(self):
         if self.launch_options:
             text = lo.summary(self.launch_options)
@@ -526,6 +546,7 @@ class GameDetailsPage(Adw.NavigationPage):
             text = "None. Choose to set them up, or to use a preset."
         self.options_row.set_subtitle(GLib.markup_escape_text(text))
         self.options_row.set_tooltip_text(self.launch_options or None)
+        self._show_warnings()
 
     def _edit_launch_options(self):
         editor = LaunchOptionsEditor(self.window, self.launch_options, game_name=self.game.props.name)

@@ -1,5 +1,5 @@
 Name:           superlion
-Version:        0.8.3
+Version:        0.8.4
 Release:        1%{?dist}
 Summary:        Native GNOME front end for your Steam library
 License:        GPL-3.0-or-later
@@ -63,6 +63,9 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/uk.co.solarflareit.Su
 %{_datadir}/icons/hicolor/*/apps/uk.co.solarflareit.Superlion*
 
 %changelog
+* Mon Oct 19 2026 Tom <tom@solarflareit.co.uk> - 0.8.4-1
+- Warn about launch options that are not needed on this computer or that cause problems, such as LD_PRELOAD="" stopping the Steam overlay and Steam Link's picture on Wayland, in the launch options editor and on a game's page.
+
 * Sun Oct 18 2026 Tom <tom@solarflareit.co.uk> - 0.8.3-1
 - Start Steam with PipeWire screen capture for Remote Play streaming, asked about in setup and changeable in Preferences.
 
