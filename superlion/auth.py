@@ -25,7 +25,7 @@ TIMEOUT = 20
 STEAMID64_BASE = 76561197960265728
 
 KEY_SCHEMA = Secret.Schema.new(
-    "uk.co.solarflareit.Superlion.SteamWebApiKey",
+    f"{config_mod.APP_ID}.SteamWebApiKey",
     Secret.SchemaFlags.NONE,
     {"kind": Secret.SchemaAttributeType.STRING},
 )
@@ -33,7 +33,7 @@ KEY_ATTRIBUTES = {"kind": "steam-web-api-key"}
 
 # The QR sign-in of earlier test builds stored a token under this schema.
 LEGACY_SCHEMA = Secret.Schema.new(
-    "uk.co.solarflareit.Superlion.Token",
+    f"{config_mod.APP_ID}.Token",
     Secret.SchemaFlags.NONE,
     {"kind": Secret.SchemaAttributeType.STRING},
 )
