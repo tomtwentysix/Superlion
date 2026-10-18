@@ -35,7 +35,7 @@ Superlion is dedicated to the memory of John Wharton of S J Wharton Ltd (1953–
 
 ### Launch options
 - Choose **Launch Options** on a game's Steam Settings to open the editor. Type the launch options directly, or switch settings on and off below them; each updates the other.
-- The settings offered are gathered from the launch options of all your games, plus GameMode, MangoHud, Gamescope and Proton's log. Each says what it does, where Superlion knows, and how many of your games use it, and settings with a value offer the values your games already use.
+- The editor offers over 100 common settings, mostly as documented by Proton-CachyOS, plus any found in your games' launch options. They are grouped as Tools, Display and HDR, Upscaling and Frame Generation (including FSR 1, for any graphics card), Performance and Latency, NVIDIA, AMD (including FSR 4), Proton and Wine, Input, Audio, VR, Logging and game arguments, and can be searched. Each says what it does and how many of your games use it, and settings with a value offer the values your games already use.
 - **Use a Preset** fills in a saved preset, and **Save as Preset…** saves the current launch options as one.
 - **Add Setting** (the + button) offers a further setting for every game: one of Superlion's suggestions, such as Disable Fsync or DXVK Frame Rate Limit, or your own variable, program or game argument.
 - **Preferences → Launch Options** manages presets and added settings, and lists every game's launch options by setting name; choose one to change it in the editor or save it as a preset.

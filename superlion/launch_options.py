@@ -21,21 +21,32 @@ VARIABLE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)=(.*)$", re.S)
 NEEDS_QUOTES = re.compile(r"[\s;&|<>()]")
 
 # Programs that start the game, in the order they are written before %command%.
-WRAPPERS = ["prime-run", "gamemoderun", "obs-gamecapture", "mangohud", "gamescope"]
+WRAPPERS = ["prime-run", "gamemoderun", "game-performance", "obs-gamecapture", "mangohud", "strangle", "gamescope"]
+# Programs whose options follow their name, up to the next variable or program.
+TAKE_OPTIONS = {"strangle"}
 
 ENV, WRAPPER, ARGUMENT = "env", "wrapper", "argument"
 
-# Categories, in the order the editor shows them.
+# Categories, in the order the editor shows them. Settings that only work on one
+# make of graphics card are kept in its own category.
 CATEGORIES = [
     "Tools",
     "Display and HDR",
-    "NVIDIA and DLSS",
+    "Upscaling and Frame Generation",
+    "Performance and Latency",
+    "NVIDIA",
+    "AMD",
     "Proton and Wine",
+    "Input",
     "Audio",
     "VR",
+    "Logging",
     "Other Variables",
     "Game Arguments",
 ]
+
+# Categories from earlier versions, for settings the user added then.
+OLD_CATEGORIES = {"NVIDIA and DLSS": "NVIDIA"}
 
 
 @dataclass
@@ -46,112 +57,340 @@ class Known:
     default: str = "1"
 
 
-# Settings Superlion can describe. Others found in the user's games are shown by name.
-CATALOGUE = {
-    (WRAPPER, "gamemoderun"): Known("GameMode", "Tools", "Applies Feral GameMode's performance tweaks while the game runs.", ""),
-    (WRAPPER, "mangohud"): Known("MangoHud", "Tools", "Shows the MangoHud overlay with frame rate and usage.", ""),
-    (WRAPPER, "gamescope"): Known(
-        "Gamescope", "Tools", "Runs the game inside Valve's Gamescope compositor with these options.", "-f"
+def _env(key, title, category, description, default="1"):
+    return (ENV, key), Known(title, category, description, default)
+
+
+def _program(key, title, category, description, default=""):
+    return (WRAPPER, key), Known(title, category, description, default)
+
+
+def _argument(key, title, description):
+    return (ARGUMENT, key), Known(title, "Game Arguments", description, "")
+
+
+# Settings Superlion can describe. Others found in the user's games are shown by
+# name. Proton-CachyOS documents most of these; those from other Proton builds or
+# from drivers say so.
+CATALOGUE = dict([
+    # Tools
+    _program("gamemoderun", "GameMode", "Tools", "Applies Feral GameMode's performance tweaks while the game runs."),
+    _program("mangohud", "MangoHud", "Tools", "Shows the MangoHud overlay with frame rate and usage."),
+    _program(
+        "gamescope", "Gamescope", "Tools",
+        "Runs the game inside Valve's Gamescope compositor with these options. "
+        "-w and -h set the game's resolution, -W and -H the output's, and -F fsr upscales with FSR 1.",
+        "-f",
     ),
-    (WRAPPER, "prime-run"): Known("NVIDIA PRIME", "Tools", "Runs the game on the NVIDIA graphics card of a laptop.", ""),
-    (WRAPPER, "obs-gamecapture"): Known("OBS Game Capture", "Tools", "Lets OBS Studio capture the game directly.", ""),
-    (ENV, "PROTON_ENABLE_WAYLAND"): Known(
-        "Wayland", "Display and HDR", "Runs the game in a native Wayland window instead of through Xwayland."
+    _program("obs-gamecapture", "OBS Game Capture", "Tools", "Lets OBS Studio capture the game directly."),
+    _program(
+        "game-performance", "Performance Power Profile", "Tools",
+        "Switches to the performance power profile while the game runs (CachyOS).",
     ),
-    (ENV, "PROTON_ENABLE_HDR"): Known("Proton HDR", "Display and HDR", "Turns on HDR output in Proton. Needs Wayland."),
-    (ENV, "DXVK_HDR"): Known("DXVK HDR", "Display and HDR", "Lets DirectX games running through DXVK output HDR."),
-    (ENV, "ENABLE_HDR_WSI"): Known("HDR Vulkan Layer", "Display and HDR", "Turns on the Vulkan layer used for HDR."),
-    (ENV, "DISABLE_HDR_WSI"): Known("Disable HDR Vulkan Layer", "Display and HDR", "Turns off the Vulkan layer used for HDR."),
-    (ENV, "DISABLE_LSFGVK"): Known(
-        "Disable Lossless Scaling", "Display and HDR", "Turns off lsfg-vk frame generation for this game."
+    _program("strangle", "Frame Rate Limiter (libstrangle)", "Tools", "Limits the frame rate to the number given.", "60"),
+
+    # Display and HDR
+    _env(
+        "PROTON_ENABLE_WAYLAND", "Wayland", "Display and HDR",
+        "Runs the game in a native Wayland window instead of through Xwayland.",
     ),
-    (ENV, "PROTON_ENABLE_NVAPI"): Known(
-        "NVAPI", "NVIDIA and DLSS", "Gives the game NVIDIA's NVAPI, which DLSS and Reflex need in some games."
+    _env("DXVK_HDR", "HDR", "Display and HDR", "Turns on HDR output for games that support it."),
+    _env(
+        "DXVK_NO_HDR", "Turn Off HDR", "Display and HDR",
+        "Keeps HDR off even where Proton would turn it on.",
     ),
-    (ENV, "PROTON_DLSS_UPGRADE"): Known("Upgrade DLSS", "NVIDIA and DLSS", "Replaces the game's DLSS with the latest version."),
-    (ENV, "PROTON_ENABLE_NGX_UPDATER"): Known(
-        "NGX Updater", "NVIDIA and DLSS", "Lets NVIDIA's NGX updater download newer DLSS files."
+    _env(
+        "PROTON_ENABLE_HDR", "Proton HDR (Old Name)", "Display and HDR",
+        "Turned on HDR in older Proton builds. Proton-CachyOS now uses HDR (DXVK_HDR) instead.",
     ),
-    (ENV, "DXVK_NVAPI_DRS_NGX_DLSS_SR_OVERRIDE"): Known(
-        "DLSS Super Resolution Override", "NVIDIA and DLSS", "Overrides the game's DLSS Super Resolution settings.", "on"
+    _env(
+        "ENABLE_HDR_WSI", "HDR Vulkan Layer", "Display and HDR",
+        "Turns on the Vulkan layer used for HDR. Only needed with NVIDIA drivers older than 595.",
     ),
-    (ENV, "DXVK_NVAPI_DRS_NGX_DLSS_SR_OVERRIDE_RENDER_PRESET_SELECTION"): Known(
-        "DLSS Preset", "NVIDIA and DLSS", "Chooses the DLSS Super Resolution preset.", "render_preset_m"
+    _env("DISABLE_HDR_WSI", "Turn Off HDR Vulkan Layer", "Display and HDR", "Turns off the Vulkan layer used for HDR."),
+    _env(
+        "WINE_FULLSCREEN_INTEGER_SCALING", "Integer Scaling", "Display and HDR",
+        "Scales full-screen games by whole numbers, for sharp pixels.",
     ),
-    (ENV, "DXVK_NVAPI_DRS_SETTINGS"): Known(
-        "NVIDIA Driver Settings", "NVIDIA and DLSS", "NVIDIA driver profile settings, applied through DXVK-NVAPI.", ""
+    _env(
+        "PROTON_NO_WM_DECORATION", "Wine Window Borders", "Display and HDR",
+        "Uses Wine's own window borders instead of the desktop's.",
     ),
-    (ENV, "NVPRESENT_ENABLE_SMOOTH_MOTION"): Known(
-        "Smooth Motion", "NVIDIA and DLSS", "Turns on NVIDIA Smooth Motion frame generation."
+    _env(
+        "WINE_DISABLE_VULKAN_OPWR", "Turn Off Cross-Process Rendering", "Display and HDR",
+        "Can remove a frame of delay in some launchers and games on Wayland.",
     ),
-    (ENV, "PROTON_NVIDIA_NVCUDA"): Known(
-        "NVIDIA CUDA", "NVIDIA and DLSS",
-        "Uses an alternative nvcuda.dll so games can use CUDA and GPU PhysX (Proton-CachyOS). "
-        "Not used in WoW64 mode.",
+    _env("WINE_USE_KWIN_HACKS", "KDE Window Fixes", "Display and HDR", "Works around window problems on older KDE Plasma."),
+    _env("DXVK_HUD", "DXVK Overlay", "Display and HDR", "Shows DXVK's overlay; fps shows the frame rate.", "fps"),
+    _env(
+        "DXVK_FRAME_RATE", "DXVK Frame Rate Limit", "Display and HDR",
+        "Limits the frame rate of DirectX games running through DXVK.", "60",
     ),
-    (ENV, "VKLayer_DLSS5"): Known(
-        "DLSS 5 Vulkan Layer", "NVIDIA and DLSS",
+    _env(
+        "MANGOHUD", "MangoHud in Vulkan Games", "Display and HDR",
+        "1 shows MangoHud in Vulkan games without the mangohud command.",
+    ),
+    _env("MANGOHUD_CONFIG", "MangoHud Settings", "Display and HDR", "MangoHud settings separated by commas.", "fps_limit=60"),
+    _env("ENABLE_VKBASALT", "vkBasalt", "Display and HDR", "Applies vkBasalt's post-processing effects, such as sharpening."),
+    _env(
+        "SDL_VIDEODRIVER", "SDL Video Driver", "Display and HDR",
+        "For native Linux games using SDL: wayland or x11.", "wayland",
+    ),
+
+    # Upscaling and frame generation that work on any graphics card
+    _env(
+        "WINE_FULLSCREEN_FSR", "FSR 1 Upscaling", "Upscaling and Frame Generation",
+        "Upscales full-screen games with AMD FSR 1 when they run below your screen's resolution. "
+        "Works on any graphics card (GE-Proton).",
+    ),
+    _env(
+        "WINE_FULLSCREEN_FSR_STRENGTH", "FSR 1 Sharpness", "Upscaling and Frame Generation",
+        "0 is the sharpest and 5 the softest; 2 is the default (GE-Proton).", "2",
+    ),
+    _env(
+        "WINE_FULLSCREEN_FSR_CUSTOM_MODE", "FSR 1 Custom Resolution", "Upscaling and Frame Generation",
+        "Offers games this resolution, such as 1920x1080, for FSR 1 to upscale from (GE-Proton).", "1920x1080",
+    ),
+    _env(
+        "PROTON_FFX3_UPGRADE", "Upgrade FSR 3", "Upscaling and Frame Generation",
+        "Upgrades the game's AMD FidelityFX 3 files, used for FSR 3 on any graphics card.",
+    ),
+    _env(
+        "PROTON_XESS_UPGRADE", "Upgrade XeSS", "Upscaling and Frame Generation",
+        "Upgrades the game's Intel XeSS to a newer version.",
+    ),
+    _env(
+        "PROTON_USE_OPTISCALER", "OptiScaler", "Upscaling and Frame Generation",
+        "Adds OptiScaler, which can replace a game's upscaler with FSR, XeSS or DLSS.",
+    ),
+    _env(
+        "PROTON_OPTISCALER_NAME", "OptiScaler File Name", "Upscaling and Frame Generation",
+        "The DLL OptiScaler is loaded as: dxgi.dll, d3d12.dll or dbghelp.dll.", "dxgi.dll",
+    ),
+    _env(
+        "PROTON_OPTISCALER_CONFIG", "OptiScaler Settings", "Upscaling and Frame Generation",
+        "Settings written to OptiScaler.ini, as Section.Option=value separated by semicolons.", "",
+    ),
+    _env(
+        "DISABLE_LSFGVK", "Turn Off Lossless Scaling", "Upscaling and Frame Generation",
+        "Turns off lsfg-vk frame generation for this game.",
+    ),
+
+    # Performance and latency
+    _env(
+        "PROTON_DXVK_LOWLATENCY", "Low-Latency DXVK", "Performance and Latency",
+        "Uses a version of DXVK with better frame pacing and lower input lag for DirectX 9 to 11 games.",
+    ),
+    _env(
+        "PROTON_VKD3D_LOWLATENCY", "Low-Latency VKD3D", "Performance and Latency",
+        "Uses a version of VKD3D-Proton with better frame pacing and lower latency for DirectX 12 games.",
+    ),
+    _env(
+        "LOW_LATENCY_LAYER", "Low Latency Layer", "Performance and Latency",
+        "Turns on the low_latency_layer Vulkan layer.",
+    ),
+    _env(
+        "PROTON_LOCAL_SHADER_CACHE", "Game Shader Cache", "Performance and Latency",
+        "Keeps a shader cache for this game in its Steam library, even when Steam's shader pre-caching is off.",
+    ),
+
+    # NVIDIA only
+    _program("prime-run", "NVIDIA PRIME", "NVIDIA", "Runs the game on the NVIDIA graphics card of a laptop."),
+    _env(
+        "PROTON_ENABLE_NVAPI", "NVAPI", "NVIDIA",
+        "Gives the game NVIDIA's NVAPI, which DLSS and Reflex need in some games.",
+    ),
+    _env("PROTON_DISABLE_NVAPI", "Turn Off NVAPI", "NVIDIA", "Stops the game using NVIDIA's NVAPI."),
+    _env("PROTON_DLSS_UPGRADE", "Upgrade DLSS", "NVIDIA", "Replaces the game's DLSS with the latest version, or the version given."),
+    _env("PROTON_DLSS_INDICATOR", "DLSS Indicator", "NVIDIA", "Shows DLSS's overlay, to confirm which DLSS is in use."),
+    _env("PROTON_ENABLE_NGX_UPDATER", "NGX Updater", "NVIDIA", "Lets NVIDIA's NGX updater download newer DLSS files."),
+    _env(
+        "DXVK_NVAPI_DRS_NGX_DLSS_SR_OVERRIDE", "DLSS Super Resolution Override", "NVIDIA",
+        "Overrides the game's DLSS Super Resolution settings.", "on",
+    ),
+    _env(
+        "DXVK_NVAPI_DRS_NGX_DLSS_SR_OVERRIDE_RENDER_PRESET_SELECTION", "DLSS Preset", "NVIDIA",
+        "Chooses the DLSS Super Resolution preset.", "render_preset_m",
+    ),
+    _env(
+        "DXVK_NVAPI_DRS_SETTINGS", "NVIDIA Driver Settings", "NVIDIA",
+        "NVIDIA driver profile settings, applied through DXVK-NVAPI.", "",
+    ),
+    _env("DXVK_NVAPI_VKREFLEX", "Reflex in Vulkan Games", "NVIDIA", "Turns on NVIDIA Reflex for Vulkan games that support it."),
+    _env("NVPRESENT_ENABLE_SMOOTH_MOTION", "Smooth Motion", "NVIDIA", "Turns on NVIDIA Smooth Motion frame generation."),
+    _env(
+        "VKLayer_DLSS5", "DLSS 5 Vulkan Layer", "NVIDIA",
         "Turns on the experimental DLSS5VKLayer, which sends the game's frames to NVIDIA's neural rendering.",
     ),
-    (ENV, "WINE_MOUSE_GRAB"): Known(
-        "Keep Mouse in Window", "Proton and Wine",
-        "Locks the mouse to the game window, so it cannot drift to another monitor or break mouse-look.",
+    _env(
+        "PROTON_NVIDIA_LIBS", "NVIDIA Libraries", "NVIDIA",
+        "Uses alternative NVIDIA CUDA, NVENC, NVML and OptiX libraries. Not used in WoW64 mode.",
     ),
-    (ENV, "VK_INSTANCE_LAYERS"): Known("Vulkan Layers", "Other Variables", "Vulkan layers to load, separated by colons.", ""),
-    (ENV, "LD_PRELOAD"): Known(
-        "Clear Preloaded Libraries", "Proton and Wine",
+    _env(
+        "PROTON_NVIDIA_LIBS_NO_32BIT", "NVIDIA Libraries: 64-Bit Only", "NVIDIA",
+        "With NVIDIA Libraries, uses only the 64-bit ones; useful on RTX 4000 and 5000 series cards.",
+    ),
+    _env(
+        "PROTON_NVIDIA_NVCUDA", "NVIDIA CUDA", "NVIDIA",
+        "Uses an alternative nvcuda.dll so games can use CUDA and GPU PhysX. Not used in WoW64 mode.",
+    ),
+    _env("PROTON_NVIDIA_NVENC", "NVIDIA Video Encoding", "NVIDIA", "Uses an alternative NVENC library, for games that record video."),
+    _env("PROTON_NVIDIA_NVOPTIX", "NVIDIA OptiX", "NVIDIA", "Uses an alternative OptiX library, for ray tracing in some apps."),
+    _env(
+        "PROTON_HIDE_NVIDIA_GPU", "Hide NVIDIA Graphics Card", "NVIDIA",
+        "Reports the graphics card as AMD, for games that misbehave on NVIDIA.",
+    ),
+    _env(
+        "__GL_THREADED_OPTIMIZATIONS", "OpenGL Threaded Optimisations", "NVIDIA",
+        "Can speed up OpenGL games on NVIDIA's driver.",
+    ),
+    _env(
+        "__GL_SHADER_DISK_CACHE_SIZE", "OpenGL Shader Cache Size", "NVIDIA",
+        "The size of NVIDIA's shader cache in bytes, such as 12000000000.", "12000000000",
+    ),
+
+    # AMD only
+    _env(
+        "PROTON_FSR4_UPGRADE", "Upgrade to FSR 4", "AMD",
+        "Upgrades games with FSR 3.1 to FSR 4, or the version given. Needs an AMD Radeon RDNA 3 or newer graphics card.",
+    ),
+    _env("PROTON_FSR4_INDICATOR", "FSR 4 Indicator", "AMD", "Shows FSR's watermark, to confirm FSR 4 is in use."),
+    _env(
+        "PROTON_MLFG_UPGRADE", "FSR Machine Learning Frame Generation", "AMD",
+        "Turns on FSR's machine learning frame generation, with FSR 4.0.3 or newer.",
+    ),
+    _env("PROTON_FFX4_UPGRADE", "Upgrade FidelityFX 4", "AMD", "Upgrades the game's AMD FidelityFX 4 files, used by FSR 4."),
+    _env(
+        "AMD_VULKAN_ICD", "AMD Vulkan Driver", "AMD",
+        "RADV uses Mesa's driver, AMDVLK uses AMD's own.", "RADV",
+    ),
+    _env(
+        "RADV_PERFTEST", "RADV Experimental Features", "AMD",
+        "Experimental features of Mesa's AMD driver, separated by commas.", "",
+    ),
+
+    # Proton and Wine
+    _env(
+        "LD_PRELOAD", "Clear Preloaded Libraries", "Proton and Wine",
         'Set to "" to stop libraries such as the Steam overlay being loaded into the game.', '""',
     ),
-    (ENV, "WINEDLLOVERRIDES"): Known(
-        "DLL Overrides", "Proton and Wine",
+    _env(
+        "WINEDLLOVERRIDES", "DLL Overrides", "Proton and Wine",
         "Loads the game's own copies of these DLLs (n) before Wine's (b), as mods such as ReShade need.", "",
     ),
-    (ENV, "WINE_DLL_OVERRIDES"): Known(
-        "DLL Overrides (Misspelt)", "Proton and Wine",
+    _env(
+        "WINE_DLL_OVERRIDES", "DLL Overrides (Misspelt)", "Proton and Wine",
         "Wine does not read this name. Use DLL Overrides (WINEDLLOVERRIDES) instead.", "",
     ),
-    (ENV, "PROTON_USE_WINED3D"): Known(
-        "WineD3D", "Proton and Wine", "1 draws DirectX through OpenGL with WineD3D instead of DXVK; 0 keeps DXVK."
+    _env(
+        "PROTON_USE_WINED3D", "WineD3D", "Proton and Wine",
+        "1 draws DirectX 9 to 11 through OpenGL with WineD3D instead of DXVK; 0 keeps DXVK.",
     ),
-    (ENV, "PROTON_USE_WOW64"): Known("WoW64 Mode", "Proton and Wine", "Runs 32-bit Windows code with Wine's newer WoW64 mode."),
-    (ENV, "PROTON_USE_EAC_LINUX"): Known("Easy Anti-Cheat for Linux", "Proton and Wine", "Uses the Linux Easy Anti-Cheat runtime."),
-    (ENV, "PROTON_LOG"): Known("Proton Log", "Proton and Wine", "Writes a log to steam-<app ID>.log in your home folder."),
-    (ENV, "PROTON_NO_ESYNC"): Known(
-        "Disable Esync", "Proton and Wine", "Turns off eventfd synchronisation, which fixes some games."
+    _env("PROTON_NO_D3D11", "Turn Off DirectX 11", "Proton and Wine", "Makes games that can fall back to DirectX 9 do so."),
+    _env("PROTON_NO_D3D10", "Turn Off DirectX 10", "Proton and Wine", "Makes games that can fall back to DirectX 9 do so."),
+    _env("PROTON_DXVK_D3D8", "DXVK for DirectX 8", "Proton and Wine", "Runs DirectX 8 games through DXVK."),
+    _env("PROTON_D7VK_DDRAW", "D7VK for DirectX 7", "Proton and Wine", "Runs DirectX 7 and older games through D7VK."),
+    _env(
+        "PROTON_DXVK_SAREK", "DXVK for Older Graphics Cards", "Proton and Wine",
+        "Uses dxvk-sarek, for cards limited to Vulkan 1.1 or 1.2. Not for games with anti-cheat or multiplayer.",
     ),
-    (ENV, "PROTON_NO_FSYNC"): Known(
-        "Disable Fsync", "Proton and Wine", "Turns off futex synchronisation, which fixes some games."
+    _env("VKD3D_CONFIG", "VKD3D-Proton Options", "Proton and Wine", "VKD3D-Proton options for DirectX 12 games, such as dxr.", ""),
+    _env(
+        "VKD3D_FEATURE_LEVEL", "DirectX 12 Feature Level", "Proton and Wine",
+        "The DirectX 12 feature level reported to games, such as 12_0.", "12_0",
     ),
-    (ENV, "PROTON_FORCE_LARGE_ADDRESS_AWARE"): Known(
-        "Large Address Aware", "Proton and Wine", "Lets 32-bit games use up to 4 GB of memory."
+    _env("PROTON_NO_FSYNC", "Turn Off Fsync", "Proton and Wine", "Turns off futex synchronisation, which fixes some games."),
+    _env(
+        "PROTON_NO_ESYNC", "Turn Off Esync", "Proton and Wine",
+        "Turns off eventfd synchronisation, which fixes some games in older Proton versions.",
     ),
-    (ENV, "PROTON_HIDE_NVIDIA_GPU"): Known(
-        "Hide NVIDIA Graphics Card", "NVIDIA and DLSS", "Reports the graphics card as AMD, for games that misbehave on NVIDIA."
+    _env("PROTON_USE_WOW64", "WoW64 Mode", "Proton and Wine", "Runs 32-bit Windows code with Wine's newer WoW64 mode."),
+    _env("PROTON_USE_EAC_LINUX", "Easy Anti-Cheat for Linux", "Proton and Wine", "Uses the Linux Easy Anti-Cheat runtime."),
+    _env(
+        "PROTON_FORCE_LARGE_ADDRESS_AWARE", "Large Address Aware", "Proton and Wine",
+        "Lets 32-bit games use up to 4 GB of memory. On by default in current Proton.",
     ),
-    (ENV, "DXVK_HUD"): Known(
-        "DXVK Overlay", "Display and HDR", "Shows DXVK's overlay; fps shows the frame rate.", "fps"
+    _env(
+        "PROTON_HEAP_DELAY_FREE", "Delay Freeing Memory", "Proton and Wine",
+        "Works around crashes in games that use memory after freeing it.",
     ),
-    (ENV, "DXVK_FRAME_RATE"): Known(
-        "DXVK Frame Rate Limit", "Display and HDR", "Limits the frame rate of DirectX games running through DXVK.", "60"
+    _env("PROTON_SET_GAME_DRIVE", "Game Drive", "Proton and Wine", "Adds an S: drive for the Steam library the game is in."),
+    _env(
+        "PROTON_OLD_GL_STRING", "Short OpenGL Extension List", "Proton and Wine",
+        "Fixes older games that crash on a long list of OpenGL extensions.",
     ),
-    (ENV, "MANGOHUD"): Known(
-        "MangoHud in Vulkan Games", "Display and HDR", "1 shows MangoHud in Vulkan games without the mangohud command."
+    _env(
+        "WINE_DO_NOT_CREATE_DXGI_DEVICE_MANAGER", "Video Playback Fix", "Proton and Wine",
+        "Works around videos that do not play in some games.",
     ),
-    (ENV, "MANGOHUD_CONFIG"): Known(
-        "MangoHud Settings", "Display and HDR", "MangoHud settings separated by commas.", "fps_limit=60"
+    _env("PROTON_MEDIA_FORCE_GST", "GStreamer Video", "Proton and Wine", "Fixes video and sound in some cutscenes."),
+    _env(
+        "HOST_LC_ALL", "Game Language and Region", "Proton and Wine",
+        "Runs the game with this locale, such as ja_JP.UTF-8.", "en_GB.UTF-8",
     ),
-    (ENV, "SteamDeck"): Known("Steam Deck Mode", "Other Variables", "Makes some games use their Steam Deck settings."),
-    (WRAPPER, "game-performance"): Known(
-        "Performance Power Profile", "Tools", "Switches to the performance power profile while the game runs (CachyOS).", ""
+    _env(
+        "WINE_BLOCK_HOSTS", "Block Internet Hosts", "Proton and Wine",
+        "Stops the game connecting to these hosts, separated by commas.", "",
     ),
-    (ENV, "PULSE_SINK"): Known("Audio Output", "Audio", "Sends the game's sound to this audio output.", ""),
-    (ENV, "PRESSURE_VESSEL_IMPORT_OPENXR_1_RUNTIMES"): Known(
-        "OpenXR Runtime", "VR", "Makes your OpenXR runtime, such as WiVRn, available inside Steam's container."
+    _env("PROTON_DISCORD_BRIDGE", "Discord Rich Presence", "Proton and Wine", "Lets the game show what you are playing in Discord."),
+    _env(
+        "PROTON_USE_XALIA", "Xalia Controller Interface", "Proton and Wine",
+        "1 adds Xalia's controller interface to programs made for keyboard and mouse; 0 turns it off.",
     ),
-    (ENV, "PRESSURE_VESSEL_FILESYSTEMS_RW"): Known(
-        "Container Folders", "VR", "Folders Steam's container may write to, such as your VR runtime's.", ""
+
+    # Input
+    _env(
+        "PROTON_PREFER_SDL", "SDL Controller Input", "Input",
+        "Reads controllers through SDL instead of Steam Input. Can fix controllers on Wayland.",
     ),
-}
+    _env(
+        "WINE_MOUSE_GRAB", "Keep Mouse in Window", "Input",
+        "Locks the mouse to the game window, so it cannot drift to another monitor or break mouse-look.",
+    ),
+
+    # Audio
+    _env("PULSE_SINK", "Audio Output", "Audio", "Sends the game's sound to this audio output.", ""),
+    _env(
+        "WINE_AUDIO_DRIVER", "Wine Audio Driver", "Audio",
+        "The audio drivers to try, in order, such as pipewire,pulse,alsa.", "pulse",
+    ),
+    _env("PROTON_USE_PIPEWIRE", "PipeWire Audio", "Audio", "1 uses Wine's PipeWire driver, the default; 0 turns it off."),
+    _env(
+        "WINEALSA_CHANNELS", "Audio Channels", "Audio",
+        "The number of audio channels: 2, 4, 6 or 8. 2 turns off spatial audio.", "2",
+    ),
+
+    # VR
+    _env(
+        "PRESSURE_VESSEL_IMPORT_OPENXR_1_RUNTIMES", "OpenXR Runtime", "VR",
+        "Makes your OpenXR runtime, such as WiVRn, available inside Steam's container.",
+    ),
+    _env(
+        "PRESSURE_VESSEL_FILESYSTEMS_RW", "Container Folders", "VR",
+        "Folders Steam's container may write to, such as your VR runtime's.", "",
+    ),
+
+    # Logging
+    _env("PROTON_LOG", "Proton Log", "Logging", "Writes a log to steam-<app ID>.log in your home folder."),
+    _env("PROTON_LOG_DIR", "Proton Log Folder", "Logging", "The folder Proton's logs are written to.", "~/proton-logs"),
+    _env("PROTON_CRASH_REPORT_DIR", "Crash Report Folder", "Logging", "Saves crash reports to this folder.", "~/proton-crashes"),
+
+    # Other
+    _env(
+        "VK_INSTANCE_LAYERS", "Vulkan Layers", "Other Variables",
+        "Vulkan layers to load, separated by colons.", "",
+    ),
+    _env("SteamDeck", "Steam Deck Mode", "Other Variables", "Makes some games use their Steam Deck settings."),
+
+    # Game arguments understood by many games
+    _argument("-dx11", "DirectX 11", "Asks the game to use DirectX 11."),
+    _argument("-dx12", "DirectX 12", "Asks the game to use DirectX 12."),
+    _argument("-vulkan", "Vulkan", "Asks the game to use Vulkan."),
+    _argument("-windowed", "Windowed", "Asks the game to start in a window."),
+    _argument("-fullscreen", "Full Screen", "Asks the game to start full screen."),
+    _argument("-novid", "Skip Intro Videos (Source)", "Skips the intro videos in Source engine games."),
+    _argument("-skipintro", "Skip Intro", "Skips the intro in games that support it."),
+])
 
 
 @dataclass
@@ -180,6 +419,9 @@ def custom_settings():
             custom = Custom(**item)
         except TypeError:
             continue
+        custom.category = OLD_CATEGORIES.get(custom.category, custom.category)
+        if custom.category not in CATEGORIES:
+            custom.category = default_category(custom.kind)
         result[(custom.kind, custom.key)] = custom
     return result
 
@@ -265,9 +507,9 @@ def parse(options, programs=()):
             end = before.index("--", i) if "--" in before[i:] else len(before)
             parsed.wrappers["gamescope"] = " ".join(before[i + 1:end])
             i = end
-        elif name in WRAPPERS:
+        elif name in WRAPPERS and name not in TAKE_OPTIONS:
             parsed.wrappers[name] = ""
-        elif name in programs:
+        elif name in programs or name in TAKE_OPTIONS:
             # Its options are the words up to the next variable or program.
             end = i + 1
             while end < len(before) and not (
@@ -366,12 +608,8 @@ def suggestions(present):
     return [setting_for(kind, key, {}) for kind, key in CATALOGUE if (kind, key) not in present]
 
 
-# Shown even when none of the user's games use them yet.
-ALWAYS_OFFERED = [(WRAPPER, "gamemoderun"), (WRAPPER, "mangohud"), (WRAPPER, "gamescope"), (ENV, "PROTON_LOG")]
-
-
 def baseline(all_options):
-    """Every setting used in the given launch options, plus common and user-added ones.
+    """Every setting Superlion knows, used in the given launch options, or added by the user.
 
     Returns {(kind, key): Setting}, counting how many games use each setting and
     which values they use.
@@ -394,7 +632,7 @@ def baseline(all_options):
             note(WRAPPER, program, program_options if program_options or program == "gamescope" else None)
         for argument in dict.fromkeys(parsed.arguments):
             note(ARGUMENT, argument)
-    for kind, key in [*ALWAYS_OFFERED, *custom]:
+    for kind, key in [*CATALOGUE, *custom]:
         settings.setdefault((kind, key), setting_for(kind, key, custom))
     return settings
 

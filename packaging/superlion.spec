@@ -1,5 +1,5 @@
 Name:           superlion
-Version:        0.8.1
+Version:        0.8.2
 Release:        1%{?dist}
 Summary:        Native GNOME front end for your Steam library
 License:        GPL-3.0-or-later
@@ -63,6 +63,9 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/uk.co.solarflareit.Su
 %{_datadir}/icons/hicolor/*/apps/uk.co.solarflareit.Superlion*
 
 %changelog
+* Sun Oct 18 2026 Tom <tom@solarflareit.co.uk> - 0.8.2-1
+- Offer over 100 common launch settings, including FSR, grouped with NVIDIA-only and AMD-only settings kept apart, and add search to the launch options editor.
+
 * Sun Oct 18 2026 Tom <tom@solarflareit.co.uk> - 0.8.1-1
 - Start Steam hidden when Superlion opens, and whenever Superlion starts or restarts Steam, so its window only appears when one of its own pages is opened.
 
