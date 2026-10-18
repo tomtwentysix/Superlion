@@ -12,9 +12,37 @@
     </p>
     <p>Dedicated to the memory of John Wharton of S J Wharton Ltd (1953–2026).</p>
   </description>
+  <url type="homepage">https://github.com/tomtwentysix/Superlion</url>
+  <url type="bugtracker">https://github.com/tomtwentysix/Superlion/issues</url>
   <launchable type="desktop-id">uk.co.solarflareit.Superlion.desktop</launchable>
   <developer id="uk.co.solarflareit">
     <name>SolarFlare Developments</name>
   </developer>
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/tomtwentysix/Superlion/main/screenshots/library.png</image>
+      <caption>Your Steam library, with Steam's collections</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/tomtwentysix/Superlion/main/screenshots/game-overview.png</image>
+      <caption>Trailers, screenshots and news for each game</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/tomtwentysix/Superlion/main/screenshots/launch-options.png</image>
+      <caption>Launch options built by switching settings on and off</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/tomtwentysix/Superlion/main/screenshots/game-information.png</image>
+      <caption>Install details, collections, mod managers and artwork</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/tomtwentysix/Superlion/main/screenshots/store.png</image>
+      <caption>The Steam store, with prices in your currency</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/tomtwentysix/Superlion/main/screenshots/library-narrow.png</image>
+      <caption>The library in a narrow window</caption>
+    </screenshot>
+  </screenshots>
   <content_rating type="oars-1.1"/>
 </component>
