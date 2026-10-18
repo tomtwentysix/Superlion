@@ -69,7 +69,6 @@ class KeyCaptureDialog(Adw.Dialog):
         self.webview.load_uri(auth.KEY_PAGE)
 
     def _on_uri(self, view, _pspec):
-        # The address is shown so it is clear this is Steam's own site.
         self.title.set_subtitle(view.get_uri() or "")
 
     def _look_for_key(self):

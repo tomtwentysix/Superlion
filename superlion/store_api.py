@@ -109,7 +109,6 @@ NEWS_TTL = 3600
 
 
 def news(appid, count=5):
-    """Recent announcements posted by the game's developers on Steam."""
     data = _get_json(
         NEWS_URL,
         {"appid": appid, "count": count, "maxlength": 0, "feeds": "steam_community_announcements"},

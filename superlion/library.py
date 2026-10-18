@@ -56,7 +56,6 @@ class Game(GObject.Object):
 
     @property
     def run_uri(self):
-        """The steam:// link that launches this game."""
         if self.props.non_steam:
             # Steam's game ID for a shortcut: the app ID in the high 32 bits,
             # with the "shortcut" type flag set in the low bits.
@@ -212,7 +211,6 @@ def _grid_files(config, appid, kind):
 
 
 def custom_art(config, appid, kind):
-    """The custom image set for this game and kind, or None."""
     return next((p for p in _grid_files(config, appid, kind) if p.is_file()), None)
 
 
@@ -246,7 +244,6 @@ def artwork_search_term(name):
 
 
 def steamgriddb_url(name):
-    """SteamGridDB's artwork search, filled in with the game's name."""
     return STEAMGRIDDB_SEARCH.format(term=quote(artwork_search_term(name)))
 
 
@@ -313,7 +310,6 @@ def sort_key(game, mode):
 
 
 def apply_metadata(games, metadata):
-    """Copy release dates and genres from Steam's app database onto games."""
     for game in games:
         info = metadata.get(game.props.appid)
         if info:

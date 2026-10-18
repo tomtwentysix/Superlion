@@ -41,9 +41,6 @@ def config_vdf_path(steam_root):
     return Path(steam_root) / "config" / "config.vdf"
 
 
-# Reading -----------------------------------------------------------------
-
-
 def read_launch_options(config, appid):
     shortcut = library.read_shortcuts(config).get(int(appid))
     if shortcut is not None:
@@ -87,9 +84,6 @@ def list_compat_tools(config):
             seen.add(name)
             tools.append(CompatTool(name, label))
     return tools
-
-
-# Writing -----------------------------------------------------------------
 
 
 def _backup(path):

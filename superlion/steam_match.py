@@ -61,9 +61,6 @@ def find_steam_appids(names, region):
     return result
 
 
-# Matches chosen by the user ---------------------------------------------------
-
-
 def _overrides_path():
     return config_mod.config_dir() / "steam_matches.json"
 

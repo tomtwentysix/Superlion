@@ -134,7 +134,6 @@ def _parse(data):
 
 
 def _vr_level(common):
-    """How a game uses VR, from the several ways Steam records it."""
     categories = set(common.get("category") or {})
     if common.get("onlyvrsupport") == 1 or "category_54" in categories:
         return VR_REQUIRED

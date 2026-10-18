@@ -135,5 +135,4 @@ class SgdbKeySetup(Gtk.Box):
             self._set_status("Connected to SteamGridDB.")
             self.emit("saved")
 
-        # A small search proves the key works before it is stored.
         auth.run_async(lambda: sgdb.search("Portal", key), done)

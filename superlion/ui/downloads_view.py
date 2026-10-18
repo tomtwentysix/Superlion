@@ -40,7 +40,6 @@ class DownloadRow(Adw.ActionRow):
         config = window.config
         art = library.find_art(config.root, config.userdata, item.appid)
         images.load(art["header"] or art["cover"], 184, 86, thumb.set_paintable)
-        # A fixed-width slot keeps every title aligned, whatever the image shape.
         self.add_prefix(Adw.Clamp(child=thumb, maximum_size=92, tightening_threshold=92, width_request=92))
         self.progress = Gtk.ProgressBar(valign=Gtk.Align.CENTER, width_request=160)
         self.add_suffix(self.progress)
@@ -113,7 +112,6 @@ class DownloadsView(Gtk.Box):
         auth.run_async(lambda: (downloads.scan(config), downloads.current_rate(config)), self._show)
 
     def _update_games(self, items):
-        """Put each game's download state on its library entry, for its cover."""
         states = {item.appid: item for item in items}
         store = self.window.library.store
         for index in range(store.get_n_items()):

@@ -7,7 +7,6 @@ from .. import config as config_mod
 from . import images
 from .details import GameDetailsPage
 from .downloads_view import DownloadsView
-from .launch_presets_dialog import LaunchPresetsDialog
 from .library_view import GROUP_TITLES, LibraryView
 from .store import StoreAppPage, StoreView
 from .steam_key_setup import SteamKeyDialog
@@ -71,8 +70,6 @@ class SuperlionWindow(Adw.ApplicationWindow):
         self.nav.add(self._build_main_page())
         self._attach_banners()
 
-    # Actions ---------------------------------------------------------------
-
     def _build_actions(self):
         for name, default, handler in (
             ("sort", "name", self._on_sort_changed),
@@ -89,7 +86,6 @@ class SuperlionWindow(Adw.ApplicationWindow):
             ("sign-in", lambda *_: self.sign_in()),
             ("sign-out", lambda *_: self.sign_out()),
             ("client-store", lambda *_: self.open_client_store()),
-            ("launch-presets", lambda *_: self.open_launch_presets()),
         ]:
             action = Gio.SimpleAction.new(name, None)
             action.connect("activate", callback)
@@ -120,8 +116,6 @@ class SuperlionWindow(Adw.ApplicationWindow):
         self._group_installed_item_allowed = view not in ("installed", "not_installed")
         self._rebuild_view_menu()
 
-    # Library page ----------------------------------------------------------
-
     def _build_main_page(self):
         header = Adw.HeaderBar()
         self.view_stack = Adw.ViewStack()
@@ -148,7 +142,6 @@ class SuperlionWindow(Adw.ApplicationWindow):
         main_menu = Gio.Menu()
         section = Gio.Menu()
         section.append("Refresh", "win.refresh")
-        section.append("Launch Option Presets", "win.launch-presets")
         section.append("Preferences", "app.preferences")
         main_menu.append_section(None, section)
         section = Gio.Menu()
@@ -255,7 +248,6 @@ class SuperlionWindow(Adw.ApplicationWindow):
         self.search_button.set_visible(in_library)
         self.sort_button.set_visible(in_library)
         self.sidebar_button.set_visible(in_library)
-        # The sidebar only applies to the Library.
         if not in_library:
             self._show_sidebar(False)
         elif not self.split.get_collapsed():
@@ -287,8 +279,6 @@ class SuperlionWindow(Adw.ApplicationWindow):
 
     def open_game(self, game):
         self.nav.push(GameDetailsPage(self, game))
-
-    # Loading ---------------------------------------------------------------
 
     def set_config(self, config):
         self.config = config
@@ -382,7 +372,6 @@ class SuperlionWindow(Adw.ApplicationWindow):
         dialog.present(self)
 
     def set_store_match(self, game, steam_appid):
-        """Remember the user's match for a non-Steam game and show it straight away."""
         steam_match.set_override(game.props.appid, steam_appid)
         # Drop artwork that came from the previous match; custom artwork is kept.
         art = library.find_art(self.config.root, self.config.userdata, game.props.appid)
@@ -397,7 +386,6 @@ class SuperlionWindow(Adw.ApplicationWindow):
             self.library.changed()
             if steam_appid:
                 self._use_steam_artwork(game, steam_appid)
-            # Reopen the details page so its tabs reflect the new match.
             page = self.nav.get_visible_page()
             if getattr(page, "game", None) is game:
                 self.nav.pop()
@@ -462,7 +450,6 @@ class SuperlionWindow(Adw.ApplicationWindow):
         dialog.present(self)
 
     def apply_store_match(self, game, steam_appid, metadata=None):
-        """Show a non-Steam game with the matched store game's metadata and artwork."""
         game.props.store_appid = steam_appid
         info = (metadata or {}).get(steam_appid)
         if info:
@@ -494,7 +481,6 @@ class SuperlionWindow(Adw.ApplicationWindow):
         auth.run_async(lambda: owned.fetch(key, steamid), done)
 
     def _owned_from_store(self):
-        """Fallback for private game details: the list the Steam store keeps for this sign-in."""
         from .store_owned import fetch_owned_appids, owned_entries
 
         def done(appids):
@@ -505,8 +491,6 @@ class SuperlionWindow(Adw.ApplicationWindow):
             self._show_games(entries)
 
         fetch_owned_appids(done)
-
-    # Sign-in ---------------------------------------------------------------
 
     @property
     def store_region(self):
@@ -538,7 +522,6 @@ class SuperlionWindow(Adw.ApplicationWindow):
         self._load_account_country()
 
     def sign_in(self, parent=None):
-        """Open the Steam account setup; its "signed-in" signal fires once a key is saved."""
         dialog = SteamKeyDialog(self)
         dialog.connect("signed-in", lambda _d: self._on_connected())
         dialog.present(parent or self)
@@ -557,8 +540,6 @@ class SuperlionWindow(Adw.ApplicationWindow):
         self._update_sign_in_state()
         self.reload()
 
-    # Collections -----------------------------------------------------------
-
     def _collections_changed(self):
         self.library.refresh_sidebar()
         self.library.changed()
@@ -576,7 +557,6 @@ class SuperlionWindow(Adw.ApplicationWindow):
         self._collections_changed()
 
     def rename_game(self, game):
-        """Rename a non-Steam game; Steam keeps the name in shortcuts.vdf."""
 
         def rename(name, steam_appid):
             game.props.name = name
@@ -601,7 +581,6 @@ class SuperlionWindow(Adw.ApplicationWindow):
         ask_game_name(self, game, rename)
 
     def set_hidden(self, game, hidden):
-        """Hide a game the way Steam does, by adding it to Steam's Hidden collection."""
         game_collections.set_steam_member("hidden", game.props.appid, hidden)
         self.queue_steam_sync()
         self._collections_changed()
@@ -629,7 +608,6 @@ class SuperlionWindow(Adw.ApplicationWindow):
         self.update_pending()
 
     def _ask_name(self, heading, body, confirm, initial, callback):
-        """Ask for a collection name; callback(name) runs only for a non-empty name."""
         dialog = Adw.AlertDialog(heading=heading, body=body)
         entry = Gtk.Entry(text=initial, activates_default=True)
         dialog.set_extra_child(entry)
@@ -648,12 +626,10 @@ class SuperlionWindow(Adw.ApplicationWindow):
 
         dialog.connect("response", on_response)
         dialog.present(self)
-        # Start in the text field with its text selected, so typing replaces the name.
         dialog.set_focus(entry)
         entry.select_region(0, -1)
 
     def new_collection(self, game=None):
-        """Create a collection, adding the given game to it if there is one."""
 
         def create(name):
             collection = game_collections.create(name)
@@ -755,10 +731,7 @@ class SuperlionWindow(Adw.ApplicationWindow):
         dialog.connect("response", on_response)
         dialog.present(self)
 
-    # Store -----------------------------------------------------------------
-
     def find_game(self, appid):
-        """The library entry for an app the user owns, or None."""
         store = self.library.store
         for i in range(store.get_n_items()):
             game = store.get_item(i)
@@ -773,7 +746,6 @@ class SuperlionWindow(Adw.ApplicationWindow):
         self.nav.push(SteamWebPage(self, url, title))
 
     def launch(self, uri, message):
-        """Send a steam:// link to Steam and confirm with a toast."""
         try:
             steam_control.open_uri(self.config, uri)
             self.toast(message)
@@ -781,7 +753,6 @@ class SuperlionWindow(Adw.ApplicationWindow):
             self.toast(f"Steam could not be opened: {error.message}")
 
     def open_website(self, url):
-        """Open a page in the default browser."""
         Gtk.UriLauncher(uri=url).launch(self, None, None)
 
     def open_artwork_picker(self, game, kind):
@@ -792,7 +763,6 @@ class SuperlionWindow(Adw.ApplicationWindow):
         picker.present(self)
 
     def set_artwork(self, game, kind, source, quiet=False):
-        """Use an image as a game's custom artwork, saved where Steam keeps its own."""
         try:
             target = str(library.set_custom_art(self.config, game.props.appid, kind, source))
         except OSError as error:
@@ -841,16 +811,12 @@ class SuperlionWindow(Adw.ApplicationWindow):
         dialog.present(self)
 
     def set_mod_manager_shortcut(self, game, is_manager):
-        """Mark a non-Steam game as a mod manager, moving it out of the main views."""
         mod_managers.set_shortcut(game.props.appid, game.props.name, is_manager)
         self.library.refresh_sidebar()
         self.library.changed()
 
     def open_folder(self, path):
         Gtk.FileLauncher(file=Gio.File.new_for_path(str(path))).launch(self, None, None)
-
-    def open_launch_presets(self):
-        LaunchPresetsDialog(self).present(self)
 
     def open_client_store(self):
         try:
@@ -860,8 +826,6 @@ class SuperlionWindow(Adw.ApplicationWindow):
 
     def toast(self, text):
         self.toasts.add_toast(Adw.Toast(title=text))
-
-    # Setup -----------------------------------------------------------------
 
     def run_setup(self, first_run=False):
         start = self.config or config_mod.detect()
@@ -873,10 +837,7 @@ class SuperlionWindow(Adw.ApplicationWindow):
         config_mod.save(wizard.result)
         self.set_config(wizard.result)
 
-    # Pending settings ------------------------------------------------------
-
     def update_pending(self):
-        """Refresh the pending changes banner and watch for Steam closing."""
         count = pending.count()
         if count:
             self.pending_banner.set_title(
@@ -907,7 +868,6 @@ class SuperlionWindow(Adw.ApplicationWindow):
         self.update_pending()
 
     def relaunch_steam(self):
-        """Close Steam, apply every waiting change, and start Steam again."""
         if self._relaunching:
             return
         self._relaunching = True
@@ -922,8 +882,6 @@ class SuperlionWindow(Adw.ApplicationWindow):
             self.update_pending()
 
         steam_control.relaunch(self.config, lambda: pending.apply_now(self.config), done)
-
-    # Banners ---------------------------------------------------------------
 
     def _attach_banners(self, *_args):
         page = self.nav.get_visible_page()

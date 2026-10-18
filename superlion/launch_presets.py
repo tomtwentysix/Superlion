@@ -26,7 +26,6 @@ def _path():
 
 
 def all_presets():
-    """Presets in the order the user created them."""
     try:
         data = json.loads(_path().read_text())
     except (OSError, ValueError):

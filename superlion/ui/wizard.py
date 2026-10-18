@@ -133,7 +133,6 @@ class Choice(GObject.Object):
         self._refresh()
 
     def _refresh(self):
-        # Long values are shortened in the row, so the full value is in the tooltip.
         selected = self.combo.get_selected_item()
         self.combo.set_tooltip_text(selected.get_string() if selected else None)
         self.other_row.set_visible(self.is_other)
@@ -146,9 +145,6 @@ class Choice(GObject.Object):
             else:
                 self.other_row.remove_css_class("error")
         self.emit("changed")
-
-
-# Setting builders shared with the Preferences window ------------------------
 
 
 def install_choices(add_group, state):
@@ -374,8 +370,6 @@ class SetupWizard(Adw.Dialog):
             page.header.set_show_end_title_buttons(False)
         self.nav.push(page)
 
-    # Pages -----------------------------------------------------------------
-
     def _welcome_page(self):
         page = WizardPage("Welcome")
         page.header.set_show_end_title_buttons(not self.first_run)
@@ -449,7 +443,6 @@ class SetupWizard(Adw.Dialog):
         page.prefs.add(self._status_group(clamp))
 
         def show_state(*_):
-            # Optional: "Skip" until a key is saved.
             page.next_button.set_label("Next" if auth.load_key() else "Skip")
 
         setup.connect("saved", lambda *_: (self.window._on_connected(), show_state()))
@@ -471,7 +464,6 @@ class SetupWizard(Adw.Dialog):
         page.prefs.add(self._status_group(clamp))
 
         def show_state(*_):
-            # Optional, like signing in: "Skip" until a working key is saved.
             page.next_button.set_label("Next" if sgdb.load_key() else "Skip")
 
         setup.connect("saved", show_state)

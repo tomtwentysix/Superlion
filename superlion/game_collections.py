@@ -43,9 +43,6 @@ def _modified_path(config):
     return _cloud_dir(config) / "cloud-storage-namespace-1.modified.json"
 
 
-# Steam's collections ------------------------------------------------------
-
-
 def load_steam(config):
     """Steam's static collections, with Favorites first and Hidden last.
 
@@ -109,9 +106,6 @@ def _apply_membership(appids, edit):
 def is_fixed(collection):
     """Favorites and Hidden are built into Steam and cannot be renamed or deleted."""
     return collection.steam_id in SPECIAL_NAMES and collection.source == "steam"
-
-
-# Superlion's collections --------------------------------------------------
 
 
 def _store_path():
@@ -236,9 +230,6 @@ def set_member(collection_id, appid, member):
                     c.appids.remove(appid)
 
     _change(apply)
-
-
-# Sync ---------------------------------------------------------------------
 
 
 def _new_steam_id():

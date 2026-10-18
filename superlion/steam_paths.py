@@ -80,7 +80,6 @@ def kind_for_root(root):
 
 
 def command_candidates():
-    """Commands that can start Steam on this system."""
     found = []
     if shutil.which("steam"):
         found.append(NATIVE_COMMAND)

@@ -66,7 +66,6 @@ def get(manager_id):
 
 
 def shortcut_ids():
-    """App IDs of non-Steam games marked as mod managers."""
     return {m.shortcut_appid for m in all_managers() if not m.is_app}
 
 
@@ -93,7 +92,6 @@ def set_shortcut(appid, name, is_manager):
 
 
 def linked(game_appid):
-    """The mod manager linked to a game, or None."""
     manager_id = _load()["links"].get(int(game_appid))
     return get(manager_id) if manager_id else None
 
@@ -122,7 +120,6 @@ def app_info(manager):
 
 
 def link_counts():
-    """How many games are linked to each mod manager, by manager ID."""
     counts = {}
     for manager_id in _load()["links"].values():
         counts[manager_id] = counts.get(manager_id, 0) + 1

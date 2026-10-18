@@ -113,8 +113,6 @@ def ensure_path(data, *keys):
     return node
 
 
-# Binary format (shortcuts.vdf) --------------------------------------------
-
 _B_MAP, _B_STRING, _B_INT32, _B_FLOAT, _B_UINT64, _B_END = 0, 1, 2, 3, 7, 8
 
 
