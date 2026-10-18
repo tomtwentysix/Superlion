@@ -1,5 +1,5 @@
 Name:           superlion
-Version:        0.8.4
+Version:        0.8.5
 Release:        1%{?dist}
 Summary:        Native GNOME front end for your Steam library
 License:        GPL-3.0-or-later
@@ -63,6 +63,9 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/uk.co.solarflareit.Su
 %{_datadir}/icons/hicolor/*/apps/uk.co.solarflareit.Superlion*
 
 %changelog
+* Mon Oct 19 2026 Tom <tom@solarflareit.co.uk> - 0.8.5-1
+- List every game's launch option warnings in Preferences, fix or ignore each one, and turn a setting on or off for all installed games. Ignored warnings are left off a game's page but still shown in its launch options. Shorten the Steam Client setting descriptions.
+
 * Mon Oct 19 2026 Tom <tom@solarflareit.co.uk> - 0.8.4-1
 - Warn about launch options that are not needed on this computer or that cause problems, such as LD_PRELOAD="" stopping the Steam overlay and Steam Link's picture on Wayland, in the launch options editor and on a game's page.
 

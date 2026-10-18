@@ -880,9 +880,17 @@ class SuperlionWindow(Adw.ApplicationWindow):
 
         on_applied(changes) runs once they are saved or queued for when Steam closes.
         """
+        self.apply_settings({appid: changes}, on_applied and (lambda: on_applied(changes)), parent)
+
+    def apply_settings(self, changes, on_applied=None, parent=None):
+        """Save {app ID: settings} to Steam, as apply_game_settings does for one game."""
+        def queue():
+            # Queue first so older queued values for these games cannot overwrite these.
+            for appid, game_changes in changes.items():
+                pending.add(appid, game_changes)
+
         if not steam_control.is_running(self.config):
-            # Queue first so older queued values for this game cannot overwrite these.
-            pending.add(appid, changes)
+            queue()
             try:
                 pending.apply_now(self.config)
             except OSError as error:
@@ -890,7 +898,7 @@ class SuperlionWindow(Adw.ApplicationWindow):
                 self.update_pending()
                 return
             if on_applied:
-                on_applied(changes)
+                on_applied()
             self.update_pending()
             self.toast("Settings saved")
             return
@@ -913,9 +921,9 @@ class SuperlionWindow(Adw.ApplicationWindow):
         def on_response(_dialog, response):
             if response == "cancel":
                 return
-            pending.add(appid, changes)
+            queue()
             if on_applied:
-                on_applied(changes)
+                on_applied()
             if response == "relaunch":
                 self.relaunch_steam()
             else:
