@@ -927,6 +927,17 @@ class SuperlionWindow(Adw.ApplicationWindow):
     def install_game(self, appid, name=""):
         install_game(self, appid, name)
 
+    def ask_restart_steam(self, reason):
+        """Offer to restart Steam now, for a setting it only reads when it starts."""
+        dialog = Adw.AlertDialog(heading="Restart Steam?", body=reason)
+        dialog.add_response("later", "Later")
+        dialog.add_response("restart", "Restart Steam")
+        dialog.set_response_appearance("restart", Adw.ResponseAppearance.SUGGESTED)
+        dialog.set_default_response("restart")
+        dialog.set_close_response("later")
+        dialog.connect("response", lambda _d, response: response == "restart" and self.relaunch_steam())
+        dialog.present(self)
+
     def relaunch_steam(self, reload=False):
         """Close Steam, write waiting changes, and start it again; reload re-reads the library."""
         if self._relaunching:

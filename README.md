@@ -53,6 +53,7 @@ Superlion is dedicated to the memory of John Wharton of S J Wharton Ltd (1953–
 
 ### Steam in the background
 - Superlion starts Steam hidden when it opens, and whenever it starts or restarts Steam, so games, downloads and installs work without Steam's window appearing. Steam's window only opens for its own pages, such as **Open Downloads in Steam**. Turn this off in **Preferences → Steam → Start Steam With Superlion**.
+- If you stream games from this PC with Steam Remote Play, Superlion starts Steam with PipeWire screen capture (`-pipewire-dmabuf`, or `-pipewire`), which streaming needs on Wayland. Setup asks whether you stream; change it at any time in **Preferences → Steam → I Stream Games From This PC**.
 
 ## Installing
 
