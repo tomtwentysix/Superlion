@@ -52,17 +52,19 @@ Superlion is dedicated to the memory of John Wharton of S J Wharton Ltd (1953–
 
 ## Installing
 
-Superlion needs GTK 4, libadwaita, WebKitGTK 6.0, GStreamer, libsecret and `python3-requests`, which Fedora Workstation already includes. Build the RPM and install it with `dnf`:
+On Fedora, install from [COPR](https://copr.fedorainfracloud.org/coprs/solartw/superlion/). Updates then arrive with your other system updates.
 
 ```bash
-packaging/build-rpm.sh
+sudo dnf copr enable solartw/superlion
 ```
 
 ```bash
-sudo dnf install ./dist/superlion-0.7.4-1.fc44.noarch.rpm
+sudo dnf install superlion
 ```
 
 Store trailers need an H.264 decoder (`gstreamer1-plugin-libav` or `gstreamer1-plugin-openh264`).
+
+To build the RPM yourself, run `packaging/build-rpm.sh`; it is written to `dist/`.
 
 ## Setup and Preferences
 
