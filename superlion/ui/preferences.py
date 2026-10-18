@@ -22,6 +22,7 @@ class PreferencesDialog(Adw.PreferencesDialog):
 
         steam = Adw.PreferencesPage(title="Steam", icon_name="applications-games-symbolic")
         self.folder, self.command = install_choices(steam.add, self.state)
+        steam.add(self._build_client_group())
         self.account = account_choice(steam.add, self.state)
         self.collect_libraries = library_groups(steam.add, self.state, lambda: self)
         self.add(steam)
@@ -47,6 +48,20 @@ class PreferencesDialog(Adw.PreferencesDialog):
         self._show_sign_in()
         self._show_sgdb()
         self.connect("closed", lambda *_: self._apply())
+
+    def _build_client_group(self):
+        group = Adw.PreferencesGroup(title="Steam Client")
+        row = Adw.SwitchRow(
+            title="Start Steam With Superlion",
+            subtitle=(
+                "Starts Steam hidden when Superlion opens, so games, downloads and installs are "
+                "ready without Steam's window appearing"
+            ),
+            active=self.state.start_steam,
+        )
+        row.connect("notify::active", lambda r, _p: setattr(self.state, "start_steam", r.get_active()))
+        group.add(row)
+        return group
 
     def _show_sign_in(self):
         for row in self._sign_in_rows:

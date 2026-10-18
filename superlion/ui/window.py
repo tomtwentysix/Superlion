@@ -842,6 +842,8 @@ class SuperlionWindow(Adw.ApplicationWindow):
     def _on_setup_finished(self, wizard):
         config_mod.save(wizard.result)
         self.set_config(wizard.result)
+        if wizard.result.start_steam:
+            steam_control.start_if_needed(wizard.result)
 
     def update_pending(self):
         count = pending.count()

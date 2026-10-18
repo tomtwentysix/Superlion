@@ -47,6 +47,8 @@ class Config:
     # Library folders added by hand in the wizard.
     extra_libraries: list = field(default_factory=list)
     sign_in_skipped: bool = False
+    # Start Steam, hidden, when Superlion opens.
+    start_steam: bool = True
 
     @property
     def root(self):
