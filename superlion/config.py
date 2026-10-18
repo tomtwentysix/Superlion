@@ -12,7 +12,9 @@ from . import steam_paths
 
 # Set by run-dev.sh, so a development copy keeps its own settings, keys and app ID.
 DEVEL = os.environ.get("SUPERLION_DEVEL") == "1"
-APP_NAME = "superlion-devel" if DEVEL else "superlion"
+# Set by run-screenshots.sh: a development copy that never writes to Steam.
+SCREENSHOTS = DEVEL and os.environ.get("SUPERLION_SCREENSHOTS") == "1"
+APP_NAME = "superlion-screenshots" if SCREENSHOTS else "superlion-devel" if DEVEL else "superlion"
 ICON_NAME = "uk.co.solarflareit.Superlion"
 APP_ID = ICON_NAME + (".Devel" if DEVEL else "")
 

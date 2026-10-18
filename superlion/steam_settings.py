@@ -11,6 +11,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
+from . import config as config_mod
 from . import library, vdf
 
 LAUNCH_PATH = ("UserLocalConfigStore", "Software", "Valve", "Steam", "apps")
@@ -118,6 +119,8 @@ def write_changes(config, changes):
 
     "name" applies to non-Steam games only, whose names Steam keeps in shortcuts.vdf.
     """
+    if config_mod.SCREENSHOTS:
+        return
     launch = {a: c["launch_options"] for a, c in changes.items() if "launch_options" in c}
     compat = {a: c["compat_tool"] for a, c in changes.items() if "compat_tool" in c}
     names = {int(a): c["name"] for a, c in changes.items() if c.get("name")}
