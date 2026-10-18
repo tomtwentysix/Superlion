@@ -17,7 +17,7 @@ Superlion is dedicated to the memory of John Wharton of S J Wharton Ltd (1953–
 ### Game pages
 - **Overview**: trailers, screenshots, description and developer updates from the Steam store.
 - **Information**: install size, location, compatibility files (the Proton prefix), release date, genres, VR support, collections, a linked mod manager, and artwork.
-- **Steam Settings**: launch options and compatibility tool (Proton version). The menu beside the launch options fills in a preset, saves the current launch options as one, or opens the preset manager.
+- **Steam Settings**: launch options and compatibility tool (Proton version). The ⚙ button beside the launch options opens the launch options builder; the menu beside it fills in a preset, saves the current launch options as one, or opens the preset manager.
 - **Play**, **Launch Mod Manager** when a mod manager is linked, and a **⋮** menu with View in Store, Browse Game Files and Open Compatibility Files.
 
 ### Non-Steam games
@@ -31,6 +31,11 @@ Superlion is dedicated to the memory of John Wharton of S J Wharton Ltd (1953–
 ### Mod managers
 - Add Linux applications as mod managers, or mark a non-Steam game as one with its **Mod Manager** switch. Non-Steam mod managers are listed under Mod Managers instead of with your games.
 - Link a game to a mod manager to get a **Launch Mod Manager** button on its page and in its right-click menu.
+
+### Launch options builder
+- Build a game's launch options by switching settings on and off instead of typing them. The settings offered are gathered from the launch options of all your games, plus GameMode, MangoHud, Gamescope and Proton's log, grouped as Tools, Display and HDR, NVIDIA and DLSS, Proton and Wine, Audio, VR, other variables and game arguments.
+- Each setting says what it does, where Superlion knows, and how many of your games use it. Settings with a value, such as DLL overrides or Gamescope's options, can be edited, and offer the values your games already use.
+- Anything else can be typed in **Your Own**. Settings the game already has keep their order, and nothing unrecognised is dropped.
 
 ### Launch option presets
 - Save launch options you use often, such as `gamemoderun mangohud %command%`, as named presets, and fill them into any game's launch options from its Steam Settings.
@@ -62,7 +67,7 @@ packaging/build-rpm.sh
 ```
 
 ```bash
-sudo dnf install ./dist/superlion-0.4-1.fc44.noarch.rpm
+sudo dnf install ./dist/superlion-0.5-1.fc44.noarch.rpm
 ```
 
 This installs the `superlion` command, the app grid launcher and the icons. Store trailers need an H.264 decoder; `dnf` installs one if it is available from your enabled repositories (`gstreamer1-plugin-libav` or `gstreamer1-plugin-openh264`).

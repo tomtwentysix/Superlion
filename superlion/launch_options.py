@@ -1,0 +1,274 @@
+"""Splitting launch options into separate settings, and joining them back.
+
+Steam launch options take the form
+
+    VARIABLE=value … wrapper programs … %command% game arguments …
+
+Each part becomes a setting that the launch options builder can switch on and
+off. Anything not recognised is kept as written, so nothing is lost.
+"""
+
+import re
+from collections import Counter
+from dataclasses import dataclass, field
+
+COMMAND = "%command%"
+VARIABLE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)=(.*)$", re.S)
+NEEDS_QUOTES = re.compile(r"[\s;&|<>()]")
+
+# Programs that start the game, in the order they are written before %command%.
+WRAPPERS = ["prime-run", "gamemoderun", "obs-gamecapture", "mangohud", "gamescope"]
+
+ENV, WRAPPER, ARGUMENT = "env", "wrapper", "argument"
+
+# Categories, in the order the builder shows them.
+CATEGORIES = [
+    "Tools",
+    "Display and HDR",
+    "NVIDIA and DLSS",
+    "Proton and Wine",
+    "Audio",
+    "VR",
+    "Other Variables",
+    "Game Arguments",
+]
+
+
+@dataclass
+class Known:
+    title: str
+    category: str
+    description: str = ""
+    default: str = "1"
+
+
+# Settings Superlion can describe. Others found in the user's games are shown by name.
+CATALOGUE = {
+    (WRAPPER, "gamemoderun"): Known("GameMode", "Tools", "Applies Feral GameMode's performance tweaks while the game runs.", ""),
+    (WRAPPER, "mangohud"): Known("MangoHud", "Tools", "Shows the MangoHud overlay with frame rate and usage.", ""),
+    (WRAPPER, "gamescope"): Known(
+        "Gamescope", "Tools", "Runs the game inside Valve's Gamescope compositor with these options.", "-f"
+    ),
+    (WRAPPER, "prime-run"): Known("NVIDIA PRIME", "Tools", "Runs the game on the NVIDIA graphics card of a laptop.", ""),
+    (WRAPPER, "obs-gamecapture"): Known("OBS Game Capture", "Tools", "Lets OBS Studio capture the game directly.", ""),
+    (ENV, "PROTON_ENABLE_WAYLAND"): Known(
+        "Wayland", "Display and HDR", "Runs the game in a native Wayland window instead of through Xwayland."
+    ),
+    (ENV, "PROTON_ENABLE_HDR"): Known("Proton HDR", "Display and HDR", "Turns on HDR output in Proton. Needs Wayland."),
+    (ENV, "DXVK_HDR"): Known("DXVK HDR", "Display and HDR", "Lets DirectX games running through DXVK output HDR."),
+    (ENV, "ENABLE_HDR_WSI"): Known("HDR Vulkan Layer", "Display and HDR", "Turns on the Vulkan layer used for HDR."),
+    (ENV, "DISABLE_HDR_WSI"): Known("Disable HDR Vulkan Layer", "Display and HDR", "Turns off the Vulkan layer used for HDR."),
+    (ENV, "DISABLE_LSFGVK"): Known(
+        "Disable Lossless Scaling", "Display and HDR", "Turns off lsfg-vk frame generation for this game."
+    ),
+    (ENV, "PROTON_ENABLE_NVAPI"): Known(
+        "NVAPI", "NVIDIA and DLSS", "Gives the game NVIDIA's NVAPI, which DLSS and Reflex need in some games."
+    ),
+    (ENV, "PROTON_DLSS_UPGRADE"): Known("Upgrade DLSS", "NVIDIA and DLSS", "Replaces the game's DLSS with the latest version."),
+    (ENV, "PROTON_ENABLE_NGX_UPDATER"): Known(
+        "NGX Updater", "NVIDIA and DLSS", "Lets NVIDIA's NGX updater download newer DLSS files."
+    ),
+    (ENV, "DXVK_NVAPI_DRS_NGX_DLSS_SR_OVERRIDE"): Known(
+        "DLSS Super Resolution Override", "NVIDIA and DLSS", "Overrides the game's DLSS Super Resolution settings.", "on"
+    ),
+    (ENV, "DXVK_NVAPI_DRS_NGX_DLSS_SR_OVERRIDE_RENDER_PRESET_SELECTION"): Known(
+        "DLSS Preset", "NVIDIA and DLSS", "Chooses the DLSS Super Resolution preset.", "render_preset_m"
+    ),
+    (ENV, "DXVK_NVAPI_DRS_SETTINGS"): Known(
+        "NVIDIA Driver Settings", "NVIDIA and DLSS", "NVIDIA driver profile settings, applied through DXVK-NVAPI.", ""
+    ),
+    (ENV, "NVPRESENT_ENABLE_SMOOTH_MOTION"): Known(
+        "Smooth Motion", "NVIDIA and DLSS", "Turns on NVIDIA Smooth Motion frame generation."
+    ),
+    (ENV, "VK_INSTANCE_LAYERS"): Known("Vulkan Layers", "Other Variables", "Vulkan layers to load, separated by colons.", ""),
+    (ENV, "LD_PRELOAD"): Known(
+        "Clear Preloaded Libraries", "Proton and Wine",
+        'Set to "" to stop libraries such as the Steam overlay being loaded into the game.', '""',
+    ),
+    (ENV, "WINEDLLOVERRIDES"): Known(
+        "DLL Overrides", "Proton and Wine",
+        "Loads the game's own copies of these DLLs (n) before Wine's (b), as mods such as ReShade need.", "",
+    ),
+    (ENV, "WINE_DLL_OVERRIDES"): Known(
+        "DLL Overrides (Misspelt)", "Proton and Wine",
+        "Wine does not read this name. Use DLL Overrides (WINEDLLOVERRIDES) instead.", "",
+    ),
+    (ENV, "PROTON_USE_WINED3D"): Known(
+        "WineD3D", "Proton and Wine", "1 draws DirectX through OpenGL with WineD3D instead of DXVK; 0 keeps DXVK."
+    ),
+    (ENV, "PROTON_USE_WOW64"): Known("WoW64 Mode", "Proton and Wine", "Runs 32-bit Windows code with Wine's newer WoW64 mode."),
+    (ENV, "PROTON_USE_EAC_LINUX"): Known("Easy Anti-Cheat for Linux", "Proton and Wine", "Uses the Linux Easy Anti-Cheat runtime."),
+    (ENV, "PROTON_LOG"): Known("Proton Log", "Proton and Wine", "Writes a log to steam-<app ID>.log in your home folder."),
+    (ENV, "PULSE_SINK"): Known("Audio Output", "Audio", "Sends the game's sound to this audio output.", ""),
+    (ENV, "PRESSURE_VESSEL_IMPORT_OPENXR_1_RUNTIMES"): Known(
+        "OpenXR Runtime", "VR", "Makes your OpenXR runtime, such as WiVRn, available inside Steam's container."
+    ),
+    (ENV, "PRESSURE_VESSEL_FILESYSTEMS_RW"): Known(
+        "Container Folders", "VR", "Folders Steam's container may write to, such as your VR runtime's.", ""
+    ),
+}
+
+
+# Splitting and joining -------------------------------------------------------
+
+
+def tokenize(options):
+    """Split on spaces outside quotes, keeping the quotes in each word."""
+    words, current, quote = [], "", ""
+    for char in options:
+        if quote:
+            current += char
+            if char == quote:
+                quote = ""
+        elif char in "\"'":
+            current += char
+            quote = char
+        elif char.isspace():
+            if current:
+                words.append(current)
+            current = ""
+        else:
+            current += char
+    if current:
+        words.append(current)
+    return words
+
+
+@dataclass
+class Parsed:
+    env: list = field(default_factory=list)  # [(name, value)], value as written, quotes included
+    wrappers: dict = field(default_factory=dict)  # {program: its options}
+    other: list = field(default_factory=list)  # Unrecognised words before %command%
+    arguments: list = field(default_factory=list)  # Game arguments, each with its values
+
+
+def parse(options):
+    words = tokenize(options)
+    parsed = Parsed()
+    if COMMAND not in words:
+        # Without %command%, Steam passes everything to the game as arguments.
+        parsed.arguments = _group_arguments(words)
+        return parsed
+    split = words.index(COMMAND)
+    before, after = words[:split], words[split + 1:]
+    i = 0
+    while i < len(before):
+        word = before[i]
+        name = word.rsplit("/", 1)[-1]
+        match = VARIABLE.match(word)
+        if match:
+            parsed.env.append((match.group(1), match.group(2)))
+        elif name == "gamescope":
+            # Its options run up to "--", after which the game's command follows.
+            end = before.index("--", i) if "--" in before[i:] else len(before)
+            parsed.wrappers["gamescope"] = " ".join(before[i + 1:end])
+            i = end
+        elif name in WRAPPERS:
+            parsed.wrappers[name] = ""
+        elif word != "env":  # "env" only sets the variables that follow it.
+            parsed.other.append(word)
+        i += 1
+    parsed.arguments = _group_arguments(after)
+    return parsed
+
+
+def _group_arguments(words):
+    """Group each -option or +option with the values that follow it."""
+    groups = []
+    for word in words:
+        if groups and not word.startswith(("-", "+")):
+            groups[-1] += " " + word
+        else:
+            groups.append(word)
+    return groups
+
+
+def quote(value):
+    """The value as written in launch options, quoted if it needs to be."""
+    if value[:1] in "\"'" or not NEEDS_QUOTES.search(value):
+        return value
+    return '"' + value.replace('"', '\\"') + '"'
+
+
+def compose(env, wrappers, other, arguments):
+    """Launch options from settings: env [(name, value)], wrappers {program: options}."""
+    words = [f"{name}={quote(value)}" for name, value in env]
+    for program in WRAPPERS:
+        if program in wrappers:
+            if program == "gamescope":
+                words += ["gamescope", wrappers[program], "--"] if wrappers[program] else ["gamescope", "--"]
+            else:
+                words += [program, wrappers[program]] if wrappers[program] else [program]
+    words += other
+    words.append(COMMAND)
+    words += arguments
+    options = " ".join(w for w in words if w)
+    return "" if options == COMMAND else options
+
+
+# Settings from the user's games -------------------------------------------------
+
+
+@dataclass
+class Setting:
+    kind: str  # ENV, WRAPPER or ARGUMENT
+    key: str  # Variable name, program name, or the argument as written
+    title: str
+    category: str
+    description: str
+    values: Counter  # Values used across the user's games, by number of games
+    games: int  # Number of games using it
+
+    @property
+    def takes_value(self):
+        if self.kind == ARGUMENT:
+            return False
+        if self.kind == WRAPPER:
+            return self.key == "gamescope"
+        return (set(self.values) or {self.common_value}) != {"1"}
+
+    @property
+    def common_value(self):
+        if self.values:
+            return self.values.most_common(1)[0][0]
+        known = CATALOGUE.get((self.kind, self.key))
+        return known.default if known else "1"
+
+
+def setting_for(kind, key):
+    known = CATALOGUE.get((kind, key))
+    if known:
+        return Setting(kind, key, known.title, known.category, known.description, Counter(), 0)
+    category = "Game Arguments" if kind == ARGUMENT else "Tools" if kind == WRAPPER else "Other Variables"
+    return Setting(kind, key, key, category, "", Counter(), 0)
+
+
+# Shown even when none of the user's games use them yet.
+ALWAYS_OFFERED = [(WRAPPER, "gamemoderun"), (WRAPPER, "mangohud"), (WRAPPER, "gamescope"), (ENV, "PROTON_LOG")]
+
+
+def baseline(all_options):
+    """Every setting used in the given launch options, plus a few common ones.
+
+    Returns {(kind, key): Setting}, counting how many games use each setting and
+    which values they use.
+    """
+    settings = {}
+
+    def note(kind, key, value=None):
+        setting = settings.setdefault((kind, key), setting_for(kind, key))
+        setting.games += 1
+        if value is not None:
+            setting.values[value] += 1
+
+    for options in all_options:
+        parsed = parse(options)
+        for name, value in dict(parsed.env).items():
+            note(ENV, name, value)
+        for program, program_options in parsed.wrappers.items():
+            note(WRAPPER, program, program_options if program == "gamescope" else None)
+        for argument in dict.fromkeys(parsed.arguments):
+            note(ARGUMENT, argument)
+    for kind, key in ALWAYS_OFFERED:
+        settings.setdefault((kind, key), setting_for(kind, key))
+    return settings
