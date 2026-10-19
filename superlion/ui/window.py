@@ -45,6 +45,8 @@ class SuperlionWindow(Adw.ApplicationWindow):
         self.api_key = ""  # The user's Steam Web API key, when connected.
         self.account_country = ""
         self.installed = []
+        self.owned_entries = []
+        self.family_entries = []
 
         provider = Gtk.CssProvider()
         provider.load_from_string(CSS)
@@ -326,15 +328,21 @@ class SuperlionWindow(Adw.ApplicationWindow):
             else []
         )
         if config_mod.SCREENSHOTS and not self.api_key:
-            self._show_games(owned.SAMPLE_GAMES)
+            self.owned_entries, self.family_entries = owned.SAMPLE_GAMES, []
+            self._show_games()
             return
-        self._show_games(owned.load_cached() if self.api_key else [])
+        self.owned_entries = owned.load_cached() if self.api_key else []
+        self.family_entries = owned.load_cached("family") if self.api_key else []
+        self._show_games()
         if self.api_key:
             self._refresh_owned()
+            self._refresh_family()
 
-    def _show_games(self, owned_entries):
+    def _show_games(self):
         installed_ids = {g.props.appid for g in self.installed}
-        games = self.installed + owned.to_games(self.config, owned_entries, installed_ids)
+        owned_ids = {int(e.get("appid", 0)) for e in self.owned_entries}
+        entries = self.owned_entries + [e for e in self.family_entries if e["appid"] not in owned_ids]
+        games = self.installed + owned.to_games(self.config, entries, installed_ids)
         library.apply_metadata(games, appinfo.load(self.config.root))
         GLib.idle_add(lambda: (self.downloads_view.refresh(), GLib.SOURCE_REMOVE)[-1])  # Covers show download state.
         for game in games:
@@ -494,7 +502,8 @@ class SuperlionWindow(Adw.ApplicationWindow):
                 self.toast("Your owned games could not be updated. Showing saved results.")
                 return
             if entries:
-                self._show_games(entries)
+                self.owned_entries = entries
+                self._show_games()
             else:
                 self._owned_from_store()
 
@@ -508,9 +517,24 @@ class SuperlionWindow(Adw.ApplicationWindow):
                 return  # Not signed in to the Steam website here; installed games still show.
             entries = owned_entries(appids, self.config.root)
             owned.save_cache(entries)
-            self._show_games(entries)
+            self.owned_entries = entries
+            self._show_games()
 
         fetch_owned_appids(done)
+
+    def _refresh_family(self):
+        from .store_owned import fetch_family_entries
+
+        key = self.api_key
+
+        def done(entries):
+            if entries is None or key != self.api_key:
+                return  # Not signed in to the Steam website here, or disconnected.
+            owned.save_cache(entries, "family")
+            self.family_entries = entries
+            self._show_games()
+
+        fetch_family_entries(auth.steamid64(self.config), done)
 
     @property
     def store_region(self):

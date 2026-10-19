@@ -29,8 +29,8 @@ SAMPLE_GAMES = [
 ]
 
 
-def _cache_path():
-    return config_mod.cache_dir() / "owned.json"
+def _cache_path(name="owned"):
+    return config_mod.cache_dir() / f"{name}.json"
 
 
 def _art_dir():
@@ -51,15 +51,16 @@ def fetch(key, steamid):
     return games
 
 
-def load_cached():
+def load_cached(name="owned"):
     try:
-        return json.loads(_cache_path().read_text())
+        return json.loads(_cache_path(name).read_text())
     except (OSError, ValueError):
         return []
 
 
 def clear_cache():
-    _cache_path().unlink(missing_ok=True)
+    for name in ("owned", "family"):
+        _cache_path(name).unlink(missing_ok=True)
 
 
 def to_games(config, owned, installed_ids):
@@ -143,9 +144,9 @@ def download_steam_art(appid, kind):
     return ""
 
 
-def save_cache(entries):
+def save_cache(entries, name="owned"):
     """Remember an owned-games list, such as one read from the store, for offline use."""
-    path = _cache_path()
+    path = _cache_path(name)
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(entries))
