@@ -5,7 +5,9 @@ from urllib.parse import urlparse
 import gi
 
 gi.require_version("WebKit", "6.0")
-from gi.repository import Adw, Gtk, WebKit  # noqa: E402
+import json  # noqa: E402
+
+from gi.repository import Adw, GLib, Gtk, WebKit  # noqa: E402
 
 from .. import config as config_mod  # noqa: E402
 
@@ -41,6 +43,58 @@ def clear_sign_in(callback=None):
         None,
         lambda m, r: (m.clear_finish(r), callback and callback()),
     )
+
+
+# The store's sign-in and data for Superlion: whether the user is signed in, the
+# Web API token Steam's own pages use, and the wishlist and cart counts.
+STATE_SCRIPT = """
+const config = document.getElementById("application_config");
+const user = config ? JSON.parse(config.dataset.store_user_config || "{}") : {};
+const cart = user.shoppingcart || {};
+return JSON.stringify({
+    signed_in: Boolean(window.g_AccountID),
+    token: user.webapi_token || "",
+    cart: cart.line_items ? cart.line_items.length : cart.line_item_count || 0,
+});
+"""
+WISHLIST_SCRIPT = """
+if (!window.g_AccountID) return JSON.stringify({signed_in: false});
+const body = new URLSearchParams({sessionid: g_sessionID, appid});
+const response = await fetch(`/api/${action}`, {method: "POST", body, credentials: "same-origin"});
+return JSON.stringify({signed_in: true, success: Boolean((await response.json()).success)});
+"""
+
+
+def run_in_store(script, args, callback):
+    """Run script, the body of an async function given args (strings), in a hidden store page.
+
+    Steam's sign-in token, the steamLoginSecure cookie, expires after about a
+    day, and the store's pages renew it as they load, so requests made with the
+    saved cookie alone are refused. callback(result) gets the script's JSON
+    result decoded, or None if the page or script failed.
+    """
+    view = WebKit.WebView(network_session=network_session())
+
+    def done(view, result):
+        try:
+            value = json.loads(view.call_async_javascript_function_finish(result).to_string())
+        except (GLib.Error, ValueError):
+            value = None
+        _running.discard(view)
+        callback(value)
+
+    def loaded(view, event):
+        if event == WebKit.LoadEvent.FINISHED:
+            view.disconnect(handler)
+            variant = GLib.Variant("a{sv}", {key: GLib.Variant("s", str(v)) for key, v in args.items()})
+            view.call_async_javascript_function(script, -1, variant, None, None, None, done)
+
+    handler = view.connect("load-changed", loaded)
+    _running.add(view)  # Kept alive until the script finishes.
+    view.load_uri("https://store.steampowered.com/cart/")
+
+
+_running = set()
 
 
 class SteamWebPage(Adw.NavigationPage):
