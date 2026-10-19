@@ -2,7 +2,7 @@
 
 from gi.repository import Adw, GLib, Gtk
 
-from .. import auth, downloads, library
+from .. import auth, downloads, library, steam_control
 from . import images
 
 GROUPS = {
@@ -60,6 +60,9 @@ class DownloadsView(Gtk.Box):
         self._timer = 0
         self._busy = False
 
+        self.closed_banner = Adw.Banner(title="Steam isn't running, so updates are paused", button_label="Start Steam")
+        self.closed_banner.connect("button-clicked", self._on_start_steam)
+        self.append(self.closed_banner)
         self.stack = Gtk.Stack(vexpand=True)
         self.prefs = Adw.PreferencesPage()
         self.groups = {}
@@ -109,7 +112,14 @@ class DownloadsView(Gtk.Box):
         if config is None or self._busy:
             return
         self._busy = True
-        auth.run_async(lambda: (downloads.scan(config), downloads.current_rate(config)), self._show)
+        auth.run_async(
+            lambda: (downloads.scan(config), downloads.current_rate(config), steam_control.is_running(config)),
+            self._show,
+        )
+
+    def _on_start_steam(self, banner):
+        banner.set_revealed(False)
+        steam_control.start(self.window.config)
 
     def _update_games(self, items):
         states = {item.appid: item for item in items}
@@ -128,7 +138,8 @@ class DownloadsView(Gtk.Box):
         self._busy = False
         if error or result is None:
             return
-        items, rate = result
+        items, rate, running = result
+        self.closed_banner.set_revealed(not running)
         self._update_games(items)
         # Covers in the library show live progress, so check often while downloading.
         self._schedule(fast=self.visible or any(i.status == "downloading" for i in items))

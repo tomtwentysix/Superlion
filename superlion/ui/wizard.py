@@ -3,12 +3,13 @@
 import copy
 from pathlib import Path
 
-from gi.repository import Adw, Gio, GObject, Gtk
+from gi.repository import Adw, Gio, GLib, GObject, Gtk
 
-from .. import auth, sgdb, steam_paths
+from .. import auth, sgdb, steam_control, steam_paths
 from .sgdb_setup import SgdbKeySetup
+from .status_header import StatusHeader
 from .steam_key_setup import SteamKeySetup
-from .sunshine_status import StreamOptions, SunshineGroup
+from .sunshine_status import StreamOptions, SunshineGroup, display_label, status_text
 
 OTHER = "\0other"
 AUTO_REGION = "auto"
@@ -50,15 +51,15 @@ class Choice(GObject.Object):
 
     __gsignals__ = {"changed": (GObject.SignalFlags.RUN_FIRST, None, ())}
 
-    def __init__(self, group, title, options, kind, validate, selected=None, other_title=None):
+    def __init__(self, group, title, options, kind, validate, selected=None, other_title=None, other_label="Other…"):
         super().__init__()
         self.options = list(options)
         self.kind = kind
         self.validate = validate
         self.other_value = ""
+        self.other_label = other_label
 
-        labels = [label for label, _value in self.options] + ["Other…"]
-        self.combo = Adw.ComboRow(title=title, model=Gtk.StringList.new(labels))
+        self.combo = Adw.ComboRow(title=title, model=self._model())
         group.add(self.combo)
 
         if kind == "folder":
@@ -108,6 +109,15 @@ class Choice(GObject.Object):
             return "Enter a value or choose one of the detected options."
         return self.validate(self.value)
 
+    def _model(self):
+        return Gtk.StringList.new([label for label, _value in self.options] + [self.other_label])
+
+    def set_options(self, options):
+        self.options = list(options)
+        self.combo.set_model(self._model())
+        self.combo.set_selected(0)
+        self._refresh()
+
     def select_value(self, value):
         values = [v for _label, v in self.options]
         if value in values:
@@ -148,46 +158,79 @@ class Choice(GObject.Object):
         self.emit("changed")
 
 
+def where(root):
+    """Where Steam's data is, in words, such as "Data in your home folder"."""
+    if steam_paths.kind_for_root(root) == "flatpak":
+        return "Data in the Flatpak's own folder"
+    if str(root).startswith(str(Path.home()) + "/"):
+        return "Data in your home folder"
+    return "Data in a folder of your choosing"
+
+
 def install_choices(add_group, state):
-    """Steam folder and Steam command choices; returns (folder, command)."""
+    """Steam Data Folder and Steam command choices, behind Change…; returns (folder, command)."""
+    summary = Adw.PreferencesGroup(title="Steam Installation")
+    add_group(summary)
+    found = Adw.ActionRow()
+    found.add_prefix(Gtk.Image(icon_name="applications-games-symbolic"))
+    change = Gtk.Button(label="Change…", valign=Gtk.Align.CENTER)
+    found.add_suffix(change)
+    summary.add(found)
+
     group = Adw.PreferencesGroup(
-        title="Steam Installation",
-        description="The Steam folder holds your settings, account data and artwork.",
+        title="Steam Data Folder", description="Where Steam keeps your accounts, settings and artwork.", visible=False,
     )
     add_group(group)
     folder = Choice(
         group,
-        "Steam Folder",
+        "Folder",
         [
-            (f"{'Flatpak' if i.kind == 'flatpak' else 'Native'}: {short_path(i.root)}", str(i.root))
+            (f"{'Flatpak' if i.kind == 'flatpak' else 'Installed Package'}: {short_path(i.root)}", str(i.root))
             for i in steam_paths.find_installs()
         ],
         "folder",
-        lambda v: None if steam_paths.is_steam_root(v) else "This folder does not contain a Steam installation.",
+        lambda v: None if steam_paths.is_steam_root(v) else "This folder does not contain Steam's data.",
         selected=state.steam_root,
-        other_title="Steam Folder",
+        other_title="Steam Data Folder",
     )
     command_group = Adw.PreferencesGroup(
-        title="Steam Command", description="Used to start, close and restart Steam."
+        title="Steam Command", description="Used to start, close and restart Steam.", visible=False,
     )
     add_group(command_group)
-    labels = {steam_paths.NATIVE_COMMAND: "Native Steam", steam_paths.FLATPAK_COMMAND: "Flatpak Steam"}
     command = Choice(
         command_group,
         "Command",
-        [(f"{labels[c]} ({c})", c) for c in steam_paths.command_candidates()],
+        [(f"{steam_paths.package_type(c)} ({c})", c) for c in steam_paths.command_candidates()],
         "text",
         lambda v: None if steam_paths.is_valid_command(v) else "This command was not found.",
         selected=state.steam_command,
         other_title="Command",
     )
 
+    def show_choices(*_):
+        group.set_visible(True)
+        command_group.set_visible(True)
+        change.set_visible(False)
+
+    def show_summary(*_):
+        if folder.error or command.error:
+            found.set_title("Steam Not Found")
+            found.set_subtitle("Choose where Steam is installed below.")
+            show_choices()
+        else:
+            found.set_title(f"Steam Found: {steam_paths.package_type(command.value)}")
+            found.set_subtitle(where(folder.value))
+
     def on_folder_changed(_choice):
         if not folder.error:
             kind = steam_paths.kind_for_root(folder.value)
             command.select_value(steam_paths.FLATPAK_COMMAND if kind == "flatpak" else steam_paths.NATIVE_COMMAND)
+        show_summary()
 
+    change.connect("clicked", show_choices)
     folder.connect("changed", on_folder_changed)
+    command.connect("changed", show_summary)
+    show_summary()
     return folder, command
 
 
@@ -200,33 +243,94 @@ def apply_install(state, folder, command):
     state.steam_command = command.value
 
 
+class AccountChoice(Choice):
+    """The Steam account picker. Until someone signs in to Steam there are no accounts,
+    so it explains that, offers to open Steam and watches for one; setup can carry on
+    without one meanwhile.
+    """
+
+    def __init__(self, group, state):
+        self.root = state.steam_root
+        self.state = state
+        accounts = steam_paths.find_accounts(self.root)
+        if not state.account_id and accounts:
+            state.account_id = accounts[0].account_id
+        self.empty = Adw.ActionRow(
+            title="No Steam Accounts Yet",
+            subtitle="Sign in to Steam once on this computer and your account appears here. "
+                     "You can also carry on and choose it later in Preferences.",
+        )
+        open_steam = Gtk.Button(label="Open Steam", valign=Gtk.Align.CENTER)
+        open_steam.connect("clicked", lambda *_: steam_control.show(self.state))
+        self.empty.add_suffix(open_steam)
+        group.add(self.empty)
+        super().__init__(
+            group,
+            "Account",
+            [(a.label, str(a.account_id)) for a in accounts],
+            "text",
+            self._check,
+            selected=str(state.account_id) if state.account_id else None,
+            other_title="SteamID64 or Account ID",
+            other_label="Enter an Account ID…",
+        )
+        self._timer = 0
+        group.connect("map", lambda *_: self._watch(not self.options))
+        group.connect("unmap", lambda *_: self._watch(False))
+        self._show_empty()
+
+    @property
+    def error(self):
+        return None if not self.options else super().error
+
+    @property
+    def value(self):
+        return super().value if self.options else ""
+
+    def _check(self, value):
+        account_id = steam_paths.parse_account_id(str(value))
+        if account_id is None:
+            return "Enter a SteamID64 or an account ID (digits only)."
+        if not steam_paths.userdata_dir(self.root, account_id).is_dir():
+            return "This account has no data folder in the selected Steam installation."
+        return None
+
+    def _show_empty(self):
+        empty = not self.options
+        self.empty.set_visible(empty)
+        self.combo.set_visible(not empty)
+        if empty:
+            self.other_row.set_visible(False)
+            self.error_label.set_visible(False)
+
+    def _watch(self, on):
+        if self._timer:
+            GLib.source_remove(self._timer)
+            self._timer = 0
+        if on:
+            self._timer = GLib.timeout_add_seconds(2, self._look)
+
+    def _look(self):
+        accounts = steam_paths.find_accounts(self.root)
+        if not accounts:
+            return GLib.SOURCE_CONTINUE
+        self._timer = 0
+        self.set_options([(a.label, str(a.account_id)) for a in accounts])
+        self._show_empty()
+        return GLib.SOURCE_REMOVE
+
+    def _refresh(self):
+        super()._refresh()
+        if hasattr(self, "empty") and not self.options:
+            self._show_empty()
+
+
 def account_choice(add_group, state):
-    root = state.steam_root
     group = Adw.PreferencesGroup(
         title="Steam Account", description="Launch options and play history are stored per account."
     )
     add_group(group)
-    accounts = steam_paths.find_accounts(root)
-    if not state.account_id and accounts:
-        state.account_id = accounts[0].account_id
-
-    def check_account(value):
-        account_id = steam_paths.parse_account_id(str(value))
-        if account_id is None:
-            return "Enter a SteamID64 or an account ID (digits only)."
-        if not steam_paths.userdata_dir(root, account_id).is_dir():
-            return "This account has no data folder in the selected Steam installation."
-        return None
-
-    return Choice(
-        group,
-        "Account",
-        [(a.label, str(a.account_id)) for a in accounts],
-        "text",
-        check_account,
-        selected=str(state.account_id) if state.account_id else None,
-        other_title="SteamID64 or Account ID",
-    )
+    return AccountChoice(group, state)
 
 
 def region_choice(add_group, state):
@@ -251,7 +355,7 @@ def region_choice(add_group, state):
 
 def apply_account(state, account, region):
     if account is not None:
-        state.account_id = steam_paths.parse_account_id(str(account.value))
+        state.account_id = steam_paths.parse_account_id(str(account.value)) or 0
     state.region_auto = region.value == AUTO_REGION
     if not state.region_auto:
         state.region = region.value.upper()
@@ -374,14 +478,13 @@ class SetupWizard(Adw.Dialog):
     def _welcome_page(self):
         page = WizardPage("Welcome")
         page.header.set_show_end_title_buttons(not self.first_run)
-        status = Adw.StatusPage(
-            icon_name="applications-games-symbolic",
-            title="Welcome to Superlion",
-            description=(
-                "Superlion shows your Steam library using Steam's own files on this computer. "
-                "Your Steam installation, account and libraries have been detected "
-                "automatically. The next pages let you confirm or change them."
-            ),
+        status = StatusHeader(
+            "applications-games-symbolic",
+            "Welcome to Superlion",
+            "Superlion shows your Steam library using Steam's own files on this computer. "
+            "Your Steam installation, account and libraries have been found "
+            "automatically. The next pages let you check or change them.",
+            icon_size=128,
         )
         page.prefs.add(self._status_group(status))
         page.next_button.connect("clicked", lambda *_: self._push(self._install_page))
@@ -406,7 +509,7 @@ class SetupWizard(Adw.Dialog):
         return page
 
     def _account_page(self):
-        page = WizardPage("Steam Account")
+        page = WizardPage("Account and Region")
         account = account_choice(page.prefs.add, self.state)
         region = region_choice(page.prefs.add, self.state)
 
@@ -481,10 +584,10 @@ class SetupWizard(Adw.Dialog):
 
     def _done_page(self):
         page = WizardPage("Ready", next_label="Start")
-        status = Adw.StatusPage(
-            icon_name="emblem-ok-symbolic",
-            title="Setup Complete",
-            description="You can change these settings later from Preferences in the main menu.",
+        status = StatusHeader(
+            "object-select-symbolic",
+            "Setup Complete",
+            "You can change these settings later from Preferences in the main menu.",
         )
         page.prefs.add(self._status_group(status))
 
@@ -492,12 +595,14 @@ class SetupWizard(Adw.Dialog):
         state = self.state
         accounts = {a.account_id: a.label for a in steam_paths.find_accounts(state.steam_root)}
         for title, value in [
-            ("Steam Folder", short_path(state.steam_root)),
-            ("Steam Command", state.steam_command),
-            ("Account", accounts.get(state.account_id, str(state.account_id))),
+            ("Steam Installation", steam_paths.package_type(state.steam_command)),
+            ("Steam Data Folder", short_path(state.steam_root)),
+            ("Account", accounts.get(state.account_id, "Not chosen yet")),
             ("Store Region", AUTO_REGION_LABEL if state.region_auto
              else f"{REGIONS.get(state.region, state.region)} ({state.region})"),
             ("Library Folders", "\n".join(short_path(p) for p in state.library_folders()) or "None"),
+            ("Sunshine", status_text()),
+            ("Stream Display", display_label(state.stream_display)),
         ]:
             row = Adw.ActionRow(title=title, subtitle=value)
             row.add_css_class("property")

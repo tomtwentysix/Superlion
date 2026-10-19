@@ -91,6 +91,11 @@ def start(config):
         _spawn(config, *start_options(config))
 
 
+def show(config):
+    """Start Steam, or bring its window forward if it is running."""
+    _spawn(config)
+
+
 def start_if_needed(config):
     """Start Steam hidden if it is not running; True if it was started."""
     if is_running(config):

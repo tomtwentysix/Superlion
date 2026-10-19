@@ -59,9 +59,7 @@ class SuperlionWindow(Adw.ApplicationWindow):
         self.set_content(self.toasts)
 
         # Banners follow the visible page so they show under its header bar.
-        self.setup_banner = Adw.Banner(
-            title="Some saved Steam folders are missing.", button_label="Open Preferences"
-        )
+        self.setup_banner = Adw.Banner(button_label="Open Preferences")
         self.setup_banner.connect(
             "button-clicked", lambda *_: self.get_application().activate_action("preferences", None)
         )
@@ -314,7 +312,9 @@ class SuperlionWindow(Adw.ApplicationWindow):
         if self.config is None:
             self.library.set_games([])
             return
-        self.setup_banner.set_revealed(bool(self.config.problems()))
+        problems = self.config.problems()
+        self.setup_banner.set_title(problems[0] if problems else "")
+        self.setup_banner.set_revealed(bool(problems))
         self._apply_pending_if_closed()
         self.library.refresh_sidebar()
         self.installed = (

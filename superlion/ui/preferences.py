@@ -26,11 +26,14 @@ class PreferencesDialog(Adw.PreferencesDialog):
         steam = Adw.PreferencesPage(title="Steam", icon_name="applications-games-symbolic")
         self.folder, self.command = install_choices(steam.add, self.state)
         steam.add(self._build_client_group())
-        steam.add(SunshineGroup())
-        steam.add(StreamOptions(self.state, lambda text: self.add_toast(Adw.Toast(title=text))))
         self.account = account_choice(steam.add, self.state)
         self.collect_libraries = library_groups(steam.add, self.state, lambda: self)
         self.add(steam)
+
+        streaming = Adw.PreferencesPage(title="Streaming", icon_name="tv-symbolic")
+        streaming.add(SunshineGroup())
+        streaming.add(StreamOptions(self.state, lambda text: self.add_toast(Adw.Toast(title=text))))
+        self.add(streaming)
 
         accounts = Adw.PreferencesPage(title="Accounts", icon_name="system-users-symbolic")
         self.region = region_choice(accounts.add, self.state)
@@ -58,7 +61,7 @@ class PreferencesDialog(Adw.PreferencesDialog):
         group = Adw.PreferencesGroup(title="Steam Client")
         row = Adw.SwitchRow(
             title="Start Steam With Superlion",
-            subtitle="Runs Steam hidden in the background",
+            subtitle="Keep Steam running in the background, so games stay updated and start faster",
             active=self.state.start_steam,
         )
         row.connect("notify::active", lambda r, _p: setattr(self.state, "start_steam", r.get_active()))

@@ -4,8 +4,10 @@ Everything here only proposes candidates; the setup wizard and config module
 decide which ones are used.
 """
 
+import functools
 import os
 import shutil
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -89,6 +91,37 @@ def command_candidates():
     ):
         found.append(FLATPAK_COMMAND)
     return found
+
+
+# Package managers asked who owns the Steam command, in order.
+PACKAGE_QUERIES = [
+    (["rpm", "-qf"], "RPM Package"),
+    (["dpkg", "-S"], "Debian Package"),
+    (["pacman", "-Qo"], "Arch Package"),
+]
+
+
+@functools.cache
+def package_type(command):
+    """What kind of package the Steam command comes from, such as "RPM Package" or "Flatpak"."""
+    words = command.split()
+    if not words:
+        return "Other"
+    if words[0] == "flatpak":
+        return "Flatpak"
+    path = shutil.which(words[0])
+    if not path:
+        return "Not Found"
+    if path.startswith("/snap/"):
+        return "Snap"
+    for query, label in PACKAGE_QUERIES:
+        if shutil.which(query[0]):
+            try:
+                if subprocess.run([*query, path], capture_output=True, timeout=5).returncode == 0:
+                    return label
+            except subprocess.SubprocessError:
+                pass
+    return "Other"
 
 
 def is_valid_command(command):
