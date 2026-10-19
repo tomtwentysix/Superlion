@@ -49,9 +49,6 @@ class Config:
     sign_in_skipped: bool = False
     # Start Steam, hidden, when Superlion opens.
     start_steam: bool = True
-    # Start Steam with PipeWire screen capture, for Steam Remote Play streaming.
-    stream: bool = False
-    stream_capture: str = "-pipewire-dmabuf"
 
     @property
     def root(self):

@@ -2,7 +2,9 @@
 
 from gi.repository import Adw, Gio, GLib, Gtk
 
-from .. import auth, downloads, library, mod_managers, owned, pending, steam_control, steam_settings, store_api
+from .. import (
+    auth, downloads, library, mod_managers, owned, pending, steam_control, steam_settings, store_api, sunshine,
+)
 from . import images
 from .. import launch_options as lo
 from .launch_options_editor import LaunchOptionsEditor, describe_warning
@@ -393,6 +395,11 @@ class GameDetailsPage(Adw.NavigationPage):
             prefix = library.prefix_path(self.window.config, game)
             if prefix:
                 items.append(("folder-open-symbolic", "Open Compatibility Files", lambda: self._open_folder(prefix)))
+            if sunshine.kind():
+                if sunshine.has(game):
+                    items.append(("video-display-symbolic", "Remove from Sunshine", self._remove_from_sunshine))
+                else:
+                    items.append(("video-display-symbolic", "Add to Sunshine", self._add_to_sunshine))
         if items:
             more = Gtk.MenuButton(
                 icon_name="view-more-symbolic", popover=self._icon_menu(items), tooltip_text="More",
@@ -595,6 +602,32 @@ class GameDetailsPage(Adw.NavigationPage):
 
     def _on_play(self, _button):
         self._open(self.game.run_uri, f"Launching {self.game.props.name}")
+
+    def _add_to_sunshine(self):
+        name = self.game.props.name
+        try:
+            restarted = sunshine.add(self.window.config, self.game)
+        except OSError as error:
+            self.window.toast(f"{name} could not be added to Sunshine: {error.strerror}")
+            return
+        self._fill_actions()
+        if restarted or not sunshine.is_running():
+            self.window.toast(f"{name} added to Sunshine")
+        else:
+            self.window.toast(f"{name} added. Restart Sunshine after this stream to see it in Moonlight.")
+
+    def _remove_from_sunshine(self):
+        name = self.game.props.name
+        try:
+            restarted = sunshine.remove(self.game)
+        except OSError as error:
+            self.window.toast(f"{name} could not be removed from Sunshine: {error.strerror}")
+            return
+        self._fill_actions()
+        if restarted or not sunshine.is_running():
+            self.window.toast(f"{name} removed from Sunshine")
+        else:
+            self.window.toast(f"{name} removed. Restart Sunshine after this stream to remove it from Moonlight.")
 
     def _on_install(self, _button):
         self.window.install_game(self.game.props.appid, self.game.props.name)

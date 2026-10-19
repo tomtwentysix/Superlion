@@ -1,5 +1,5 @@
 Name:           superlion
-Version:        0.8.5
+Version:        0.9.0
 Release:        1%{?dist}
 Summary:        Native GNOME front end for your Steam library
 License:        GPL-3.0-or-later
@@ -63,6 +63,9 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/uk.co.solarflareit.Su
 %{_datadir}/icons/hicolor/*/apps/uk.co.solarflareit.Superlion*
 
 %changelog
+* Mon Oct 19 2026 Tom <tom@solarflareit.co.uk> - 0.9.0-1
+- Add games to Sunshine from their ⋮ menu to stream them to Moonlight. Each stream switches the main monitor to the client's resolution, refresh rate and HDR or SDR, plays games straight into Sunshine's surround sound with EasyEffects quit, and puts everything back when the game is quit. Setup and Preferences show whether Sunshine is installed, running and able to stream HDR. Remove the Steam Remote Play streaming option.
+
 * Mon Oct 19 2026 Tom <tom@solarflareit.co.uk> - 0.8.5-1
 - List every game's launch option warnings in Preferences, fix or ignore each one, and turn a setting on or off for all installed games. Ignored warnings are left off a game's page but still shown in its launch options. Shorten the Steam Client setting descriptions.
 
