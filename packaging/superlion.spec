@@ -1,5 +1,5 @@
 Name:           superlion
-Version:        0.9.6
+Version:        0.9.7
 Release:        1%{?dist}
 Summary:        Native GNOME front end for your Steam library
 License:        GPL-3.0-or-later
@@ -65,6 +65,9 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/uk.co.solarflareit.Su
 %{_datadir}/dnf5/repos.override.d/50-superlion.repo
 
 %changelog
+* Mon Oct 19 2026 Tom <tom@solarflareit.co.uk> - 0.9.7-1
+- Add programs to Steam from Files with a new Add to Steam script, turned on in Preferences. Each program gets a name and compatibility tool, and Flatpak Steam can be given access to its folder.
+
 * Mon Oct 19 2026 Tom <tom@solarflareit.co.uk> - 0.9.6-1
 - Add games to the cart from their store pages, choosing an edition or bundle, and see, count and change the cart in the Store sidebar. Check Out opens Steam's own checkout for payment.
 

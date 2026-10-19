@@ -5,7 +5,7 @@ import copy
 from gi.repository import Adw, Gtk
 
 from .. import config as config_mod
-from .. import sgdb, steam_paths
+from .. import sgdb, shortcuts, steam_paths
 from .launch_options_prefs import LaunchOptionsPage
 from .sgdb_setup import SgdbKeySetup
 from .sunshine_status import StreamOptions, SunshineGroup
@@ -26,6 +26,8 @@ class PreferencesDialog(Adw.PreferencesDialog):
         steam = Adw.PreferencesPage(title="Steam", icon_name="applications-games-symbolic")
         self.folder, self.command = install_choices(steam.add, self.state)
         steam.add(self._build_client_group())
+        if shortcuts.files_available():
+            steam.add(self._build_files_group())
         self.account = account_choice(steam.add, self.state)
         self.collect_libraries = library_groups(steam.add, self.state, lambda: self)
         self.add(steam)
@@ -65,6 +67,23 @@ class PreferencesDialog(Adw.PreferencesDialog):
             active=self.state.start_steam,
         )
         row.connect("notify::active", lambda r, _p: setattr(self.state, "start_steam", r.get_active()))
+        group.add(row)
+        return group
+
+    def _build_files_group(self):
+        group = Adw.PreferencesGroup(title="Files")
+        subtitle = "Right-click a program in Files and choose Scripts, then Add to Steam"
+        if self.state.steam_kind == "flatpak":
+            subtitle += ". Flatpak Steam will be given access to a program's folder when you ask"
+        row = Adw.SwitchRow(title="Add to Steam From Files", subtitle=subtitle, active=shortcuts.script_installed())
+
+        def toggled(row, _pspec):
+            try:
+                shortcuts.install_script() if row.get_active() else shortcuts.remove_script()
+            except OSError as error:
+                self.add_toast(Adw.Toast(title=f"The Files script could not be changed: {error.strerror}"))
+
+        row.connect("notify::active", toggled)
         group.add(row)
         return group
 

@@ -863,6 +863,16 @@ class SuperlionWindow(Adw.ApplicationWindow):
         self.library.refresh_sidebar()
         self.library.changed()
 
+    def add_to_steam(self, paths):
+        if self.config is None or self.config.problems():
+            self.toast("Finish setting up Superlion before adding programs to Steam")
+            return
+        from .add_shortcut import AddShortcutDialog
+
+        dialog = AddShortcutDialog(self, paths)
+        dialog.connect("add", lambda _d, changes: self.apply_settings(changes, reload=True))
+        dialog.present(self)
+
     def open_folder(self, path):
         Gtk.FileLauncher(file=Gio.File.new_for_path(str(path))).launch(self, None, None)
 
@@ -924,8 +934,11 @@ class SuperlionWindow(Adw.ApplicationWindow):
         """
         self.apply_settings({appid: changes}, on_applied and (lambda: on_applied(changes)), parent)
 
-    def apply_settings(self, changes, on_applied=None, parent=None):
-        """Save {app ID: settings} to Steam, as apply_game_settings does for one game."""
+    def apply_settings(self, changes, on_applied=None, parent=None, reload=False):
+        """Save {app ID: settings} to Steam, as apply_game_settings does for one game.
+
+        reload re-reads the library once they are written, for changes that add games.
+        """
         def queue():
             # Queue first so older queued values for these games cannot overwrite these.
             for appid, game_changes in changes.items():
@@ -943,6 +956,8 @@ class SuperlionWindow(Adw.ApplicationWindow):
                 on_applied()
             self.update_pending()
             self.toast("Settings saved")
+            if reload:
+                self.reload()
             return
 
         dialog = Adw.AlertDialog(
@@ -967,7 +982,7 @@ class SuperlionWindow(Adw.ApplicationWindow):
             if on_applied:
                 on_applied()
             if response == "relaunch":
-                self.relaunch_steam()
+                self.relaunch_steam(reload=reload)
             else:
                 self.update_pending()
 
