@@ -776,7 +776,6 @@ class SuperlionWindow(Adw.ApplicationWindow):
         Gtk.UriLauncher(uri=url).launch(self, None, None)
 
     def refresh_updates(self):
-        """Compare installed builds with Steam's app database again."""
         if self.config:
             library.apply_metadata(self.installed, appinfo.load(self.config.root))
 
