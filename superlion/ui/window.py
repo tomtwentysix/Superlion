@@ -923,7 +923,9 @@ class SuperlionWindow(Adw.ApplicationWindow):
 
     def update_pending(self):
         count = pending.count()
-        if count:
+        if count and pending.only_tools_waiting():
+            self.pending_banner.set_title("Steam will find your changed Proton builds when it restarts")
+        elif count:
             self.pending_banner.set_title(
                 f"{count} change{'s' if count != 1 else ''} will be written to Steam when it closes"
             )

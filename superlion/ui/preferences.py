@@ -7,6 +7,7 @@ from gi.repository import Adw, Gtk
 from .. import config as config_mod
 from .. import sgdb, shortcuts, steam_paths
 from .launch_options_prefs import LaunchOptionsPage
+from .proton_manager import ProtonGroup
 from .sgdb_setup import SgdbKeySetup
 from .sunshine_status import StreamOptions, SunshineGroup
 from .webview import clear_sign_in
@@ -28,6 +29,7 @@ class PreferencesDialog(Adw.PreferencesDialog):
         steam.add(self._build_client_group())
         if shortcuts.files_available():
             steam.add(self._build_files_group())
+        steam.add(ProtonGroup(self, window))
         self.account = account_choice(steam.add, self.state)
         self.collect_libraries = library_groups(steam.add, self.state, lambda: self)
         self.add(steam)

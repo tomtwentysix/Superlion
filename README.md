@@ -61,6 +61,11 @@ Superlion is dedicated to the memory of John Wharton of S J Wharton Ltd (1953–
 - Playing, installing and streaming a game start Steam hidden, so they work without Steam's window appearing. Steam's window only opens for its own pages, such as **Open Downloads in Steam**.
 - **Preferences → Steam → Start Steam With Superlion** keeps Steam running in the background from when Superlion opens, so games stay updated and start faster. While Steam is closed, the Downloads tab says that updates are paused and offers to start it.
 
+### Proton builds
+- **Preferences → Steam → Proton Builds** lists the compatibility tools in Steam's `compatibilitytools.d` with their versions, and offers updates for [GE-Proton](https://github.com/GloriousEggroll/proton-ge-custom) and [Proton-CachyOS](https://github.com/CachyOS/proton-cachyos). **Install…** offers each one's recent releases. Downloads are checked against their published checksums before they are unpacked.
+- A build kept in one folder across versions, such as ProtonPlus's “Latest” builds, is updated in place, so games set to it keep using it. Other builds are updated by installing the new version beside the old one.
+- Steam lists new and removed builds once it restarts; the banner offers to relaunch it.
+
 ### Streaming with Sunshine
 - **Add to Sunshine** in a game's **⋮** menu lists it in [Sunshine](https://github.com/LizardByte/Sunshine), so Moonlight can start it. Setup and **Preferences → Streaming** show whether Sunshine is installed, running and able to stream HDR, which needs Sunshine from [LizardByte's COPR](https://copr.fedorainfracloud.org/coprs/lizardbyte/stable/) rather than the Flatpak or AppImage.
 - **Stream Display** shows games on the main monitor, which switches to each stream's resolution, refresh rate and HDR or SDR while other monitors are turned off, or on a dummy plug, which leaves your monitors as they are and keeps your windows off the stream.
