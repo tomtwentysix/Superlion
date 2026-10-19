@@ -637,7 +637,7 @@ def warnings(options, custom=None):
     if "LD_PRELOAD" in env and not env["LD_PRELOAD"].strip("\"'"):
         warn(
             "LD_PRELOAD", BREAKS, "overlay",
-            "Stops the Steam overlay and its screenshots. On Wayland, Steam Remote Play and Steam Link show no picture.",
+            "Stops the Steam overlay and its screenshots.",
         )
     if "PROTON_PREFER_SDL" in on:
         warn("PROTON_PREFER_SDL", BREAKS, "steam-input", "Controller layouts set in Steam Input are not used.")
