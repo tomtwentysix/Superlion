@@ -35,6 +35,10 @@ def _easyeffects():
     return None
 
 
+def installed():
+    return _easyeffects() is not None
+
+
 def _running():
     return subprocess.run(["pgrep", "-x", "easyeffects"], capture_output=True).returncode == 0
 

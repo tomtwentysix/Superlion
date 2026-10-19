@@ -18,6 +18,7 @@ from . import steam_control  # noqa: E402
 
 CONFIG_DIR = Path(GLib.get_user_config_dir()) / "sunshine"
 APPS_PATH = CONFIG_DIR / "apps.json"
+CONF_PATH = CONFIG_DIR / "sunshine.conf"
 LOG_PATH = CONFIG_DIR / "sunshine.log"
 SERVICE = "app-dev.lizardbyte.app.Sunshine.service"
 FLATPAK_ID = "dev.lizardbyte.app.Sunshine"
@@ -185,6 +186,26 @@ def _reload():
     if not is_running() or is_streaming():
         return False
     subprocess.run(["systemctl", "--user", "restart", "--no-block", SERVICE], timeout=10)
+    return True
+
+
+def set_output(connector):
+    """Have Sunshine capture connector, or its first monitor for "". True if sunshine.conf changed.
+
+    sunshine.conf holds one "name = value" setting per line.
+    """
+    try:
+        lines = CONF_PATH.read_text().splitlines()
+    except OSError:
+        lines = []
+    kept = [line for line in lines if line.split("=", 1)[0].strip() != "output_name"]
+    if connector:
+        kept.append(f"output_name = {connector}")
+    if kept == lines:
+        return False
+    CONF_PATH.parent.mkdir(parents=True, exist_ok=True)
+    CONF_PATH.write_text("".join(line + "\n" for line in kept))
+    _reload()
     return True
 
 

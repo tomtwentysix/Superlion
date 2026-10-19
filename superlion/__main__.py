@@ -4,21 +4,30 @@ from pathlib import Path
 
 # Run by Sunshine before and after a stream, which sets SUNSHINE_CLIENT_* for the client's request.
 if sys.argv[1:] == ["--sunshine-prepare"]:
-    from . import audio, display
+    from . import audio, config, desktop, display
 
-    audio.bypass()
+    settings = config.load() or config.Config()
+    if settings.stream_audio != "easyeffects":
+        audio.bypass()
+    if settings.stream_quiet:
+        desktop.quiet()
     env = os.environ
+    width, height = env.get("SUNSHINE_CLIENT_WIDTH", 0), env.get("SUNSHINE_CLIENT_HEIGHT", 0)
+    if settings.stream_resolution:
+        width, height = settings.stream_resolution.split("x")
     display.prepare(
-        int(env.get("SUNSHINE_CLIENT_WIDTH", 0)),
-        int(env.get("SUNSHINE_CLIENT_HEIGHT", 0)),
+        int(width),
+        int(height),
         int(env.get("SUNSHINE_CLIENT_FPS", 0)),
         env.get("SUNSHINE_CLIENT_HDR") == "true",
+        settings.stream_display,
     )
     sys.exit(0)
 if sys.argv[1:] == ["--sunshine-restore"]:
-    from . import audio, display
+    from . import audio, config, desktop, display
 
-    display.restore()
+    display.restore((config.load() or config.Config()).stream_display)
+    desktop.restore()
     audio.restore()
     sys.exit(0)
 if sys.argv[1:2] == ["--sunshine-close"] and len(sys.argv) == 3:

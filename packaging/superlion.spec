@@ -1,5 +1,5 @@
 Name:           superlion
-Version:        0.9.0
+Version:        0.9.1
 Release:        1%{?dist}
 Summary:        Native GNOME front end for your Steam library
 License:        GPL-3.0-or-later
@@ -63,6 +63,9 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/uk.co.solarflareit.Su
 %{_datadir}/icons/hicolor/*/apps/uk.co.solarflareit.Superlion*
 
 %changelog
+* Mon Oct 19 2026 Tom <tom@solarflareit.co.uk> - 0.9.1-1
+- Add While Streaming settings: stream on the main monitor or a dummy plug, which is turned off between streams; make a dummy plug act as a 4K, 1440p or 1080p HDR display with generated display information, kept after restarting; fix the resolution or match Moonlight; play sound straight to Sunshine or through EasyEffects; hide the dock and notifications while streaming. Prefer modes that reach the client's frame rate.
+
 * Mon Oct 19 2026 Tom <tom@solarflareit.co.uk> - 0.9.0-1
 - Add games to Sunshine from their ⋮ menu to stream them to Moonlight. Each stream switches the main monitor to the client's resolution, refresh rate and HDR or SDR, plays games straight into Sunshine's surround sound with EasyEffects quit, and puts everything back when the game is quit. Setup and Preferences show whether Sunshine is installed, running and able to stream HDR. Remove the Steam Remote Play streaming option.
 

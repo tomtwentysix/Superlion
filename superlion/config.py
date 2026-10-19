@@ -49,6 +49,14 @@ class Config:
     sign_in_skipped: bool = False
     # Start Steam, hidden, when Superlion opens.
     start_steam: bool = True
+    # Sunshine streams: the connector games are shown on ("" for the primary monitor),
+    # its resolution ("" to match the client, or such as "1920x1080"), whether games
+    # play "direct" to Sunshine or through "easyeffects", and whether the dock and
+    # notification banners are hidden.
+    stream_display: str = ""
+    stream_resolution: str = ""
+    stream_audio: str = "direct"
+    stream_quiet: bool = True
 
     @property
     def root(self):

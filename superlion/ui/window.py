@@ -2,8 +2,11 @@
 
 from gi.repository import Adw, Gio, GLib, GObject, Gtk
 
-from .. import appinfo, auth, game_collections, library, mod_managers, owned, pending, steam_control, steam_match
+from .. import (
+    appinfo, auth, game_collections, library, mod_managers, owned, pending, steam_control, steam_match, sunshine,
+)
 from .. import config as config_mod
+from .. import display
 from . import images
 from .details import GameDetailsPage
 from .downloads_view import DownloadsView
@@ -288,6 +291,13 @@ class SuperlionWindow(Adw.ApplicationWindow):
         self._remove_legacy_sign_in()
         self.api_key = auth.load_key() if config else ""
         self._update_sign_in_state()
+        if config and sunshine.kind():
+            sunshine.set_output(config.stream_display)
+            if config.stream_display:
+                try:
+                    display.turn_off(config.stream_display)
+                except GLib.Error:
+                    pass  # Not running under GNOME.
         self.reload()
 
     def _remove_legacy_sign_in(self):

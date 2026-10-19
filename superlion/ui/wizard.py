@@ -8,7 +8,7 @@ from gi.repository import Adw, Gio, GObject, Gtk
 from .. import auth, sgdb, steam_paths
 from .sgdb_setup import SgdbKeySetup
 from .steam_key_setup import SteamKeySetup
-from .sunshine_status import SunshineGroup
+from .sunshine_status import StreamOptions, SunshineGroup
 
 OTHER = "\0other"
 AUTO_REGION = "auto"
@@ -438,6 +438,7 @@ class SetupWizard(Adw.Dialog):
     def _sunshine_page(self):
         page = WizardPage("Moonlight Streaming")
         page.prefs.add(SunshineGroup())
+        page.prefs.add(StreamOptions(self.state, self.window.toast))
         page.next_button.connect("clicked", lambda *_: self._push(self._sign_in_page))
         return page
 
