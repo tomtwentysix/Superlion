@@ -232,8 +232,8 @@ class SuperlionWindow(Adw.ApplicationWindow):
         return Adw.NavigationPage(child=self.split, title="Superlion", tag="main")
 
     def _restore_sidebar(self):
-        """Return the sidebar to the user's choice on wide windows, unless the Store is open."""
-        self._show_sidebar(self._sidebar_wanted and self.view_stack.get_visible_child_name() == "library")
+        """Return the sidebar to the user's choice on wide windows, unless Downloads is open."""
+        self._show_sidebar(self._sidebar_wanted and self.view_stack.get_visible_child_name() != "downloads")
 
     def _show_sidebar(self, show):
         """Show or hide the sidebar without recording it as the user's choice."""
@@ -242,9 +242,9 @@ class SuperlionWindow(Adw.ApplicationWindow):
         self._sidebar_changing = False
 
     def _on_sidebar_toggled(self, split, _pspec):
-        # Only the user's own toggles in the Library on a wide window count as a choice.
-        in_library = self.view_stack.get_visible_child_name() == "library"
-        if not self._sidebar_changing and in_library and not split.get_collapsed():
+        # Only the user's own toggles in the Library or Store on a wide window count as a choice.
+        with_sidebar = self.view_stack.get_visible_child_name() != "downloads"
+        if not self._sidebar_changing and with_sidebar and not split.get_collapsed():
             self._sidebar_wanted = split.get_show_sidebar()
 
     def _on_section_changed(self, *_):
@@ -252,8 +252,10 @@ class SuperlionWindow(Adw.ApplicationWindow):
         in_library, in_store = section == "library", section == "store"
         self.search_button.set_visible(in_library)
         self.sort_button.set_visible(in_library)
-        self.sidebar_button.set_visible(in_library)
-        if not in_library:
+        self.sidebar_button.set_visible(in_library or in_store)
+        if in_library or in_store:
+            self.split.set_sidebar(self.library.sidebar if in_library else self.store_view.sidebar)
+        if not (in_library or in_store):
             self._show_sidebar(False)
         elif not self.split.get_collapsed():
             self._show_sidebar(self._sidebar_wanted)
@@ -345,6 +347,7 @@ class SuperlionWindow(Adw.ApplicationWindow):
                 game.props.store_appid = game.props.appid
         self._match_shortcuts([g for g in games if g.props.non_steam])
         self.library.set_games(games)
+        self.store_view.sort_genres(games)
 
     def _match_shortcuts(self, shortcuts):
         """Link non-Steam games to the same game on the Steam store, where there is one.

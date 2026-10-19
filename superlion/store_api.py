@@ -67,6 +67,60 @@ def featured(region):
     }
 
 
+def genre(name, region):
+    """A genre's lists, such as {"Top Sellers": [app IDs], "New Releases": [...]}."""
+    data = _get_json(f"{STORE}/api/getappsingenre/", {"genre": name, "cc": region, "l": "english"}, LIST_TTL)
+    return {
+        tab.get("name", key): list(dict.fromkeys(i["id"] for i in tab.get("items", []) if i.get("type") == 0))
+        for key, tab in (data.get("tabs") or {}).items()
+    }
+
+
+ITEMS_URL = "https://api.steampowered.com/IStoreBrowseService/GetItems/v1"
+ASSETS = "https://shared.akamai.steamstatic.com/store_item_assets/"
+
+
+def items(appids, region):
+    """Names, prices and art for many apps at once, as {app ID: item}.
+
+    Items have featured()'s "id", "name", "large_capsule_image", "tiny_image",
+    "discounted" and "discount_percent", plus "price_text" and "original_text"
+    formatted by the store, "final_cents" and "release" (Unix time, or 0).
+    """
+    found = {}
+    appids = list(appids)
+    for start in range(0, len(appids), 50):
+        request = {
+            "ids": [{"appid": a} for a in appids[start:start + 50]],
+            "context": {"language": "english", "country_code": region},
+            "data_request": {"include_assets": True, "include_release": True},
+        }
+        data = _get_json(ITEMS_URL, {"input_json": json.dumps(request)}, LIST_TTL)
+        for item in (data.get("response") or {}).get("store_items", []):
+            if item.get("success") != 1:
+                continue
+            option = item.get("best_purchase_option") or {}
+            assets = item.get("assets") or {}
+
+            def art(name, assets=assets):
+                return ASSETS + assets["asset_url_format"].replace("${FILENAME}", assets[name]) if name in assets else ""
+
+            discount = int(option.get("discount_pct", 0) or 0)
+            found[item["appid"]] = {
+                "id": item["appid"],
+                "name": item.get("name", ""),
+                "large_capsule_image": art("main_capsule"),
+                "tiny_image": art("small_capsule"),
+                "price_text": "Free" if item.get("is_free") else option.get("formatted_final_price", ""),
+                "original_text": option.get("formatted_original_price", ""),
+                "final_cents": int(option.get("final_price_in_cents", 0) or 0),
+                "discount_percent": discount,
+                "discounted": bool(discount),
+                "release": int((item.get("release") or {}).get("steam_release_date", 0) or 0),
+            }
+    return found
+
+
 def search(term, region):
     data = _get_json(
         f"{STORE}/api/storesearch/", {"term": term, "cc": region, "l": "english"}, LIST_TTL
