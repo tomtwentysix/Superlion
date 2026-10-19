@@ -22,6 +22,7 @@ Superlion is dedicated to the memory of John Wharton of S J Wharton Ltd (1953–
 - **Play**, **Launch Mod Manager** when a mod manager is linked, and the game's **⋮** menu. **Choose Cover…** offers SteamGridDB artwork or a file.
 
 ### Non-Steam games
+- Add programs to Steam from Files: turn on **Preferences → Steam → Add to Steam From Files**, then right-click a program and choose **Scripts → Add to Steam**. Each program can be given a compatibility tool, and Flatpak Steam can be given access to the program's folder.
 - Rename them; suggestions from the Steam store fill in a game's exact name.
 - Match them to the same game on the Steam store, automatically by exact name or by choosing it yourself. A matched game gets that game's store page, news, release date, genres and artwork. Steam's artwork fills any missing images, and you are asked before custom images are replaced.
 

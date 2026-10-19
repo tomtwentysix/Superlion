@@ -124,6 +124,24 @@ def write_changes(config, changes):
     launch = {a: c["launch_options"] for a, c in changes.items() if "launch_options" in c}
     compat = {a: c["compat_tool"] for a, c in changes.items() if "compat_tool" in c}
     names = {int(a): c["name"] for a, c in changes.items() if c.get("name")}
+    added = [c["shortcut"] for c in changes.values() if "shortcut" in c]
+
+    if added:
+        path = library.shortcuts_path(config)
+        data = vdf.load_binary(path) if path.is_file() else {"shortcuts": {}}
+        entries = vdf.ensure_path(data, "shortcuts")
+        existing = {library.field(e, "appid") for e in entries.values() if isinstance(e, dict)}
+        # Entries are keyed "0", "1", ... in order.
+        index = max((int(k) for k in entries if k.isdigit()), default=-1) + 1
+        for entry in added:
+            if entry["appid"] not in existing:
+                entries[str(index)] = entry
+                index += 1
+        if path.is_file():
+            _write_atomic(path, data, binary=True)
+        else:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(vdf.dumps_binary(data))
 
     shortcut_ids = set(library.read_shortcuts(config)) if (launch or names) else set()
     shortcut_launch = {int(a): o for a, o in launch.items() if int(a) in shortcut_ids}

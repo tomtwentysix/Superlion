@@ -16,13 +16,13 @@ from .ui.dedication import COMPANY, DEDICATION, KNOWN_FOR, NAME, TRIBUTE, YEARS 
 PACKAGE_DIR = Path(__file__).parent
 # The interface's own icons, and the application icon kept with the project data.
 ICON_DIRS = (PACKAGE_DIR / "icons", PACKAGE_DIR.parent / "data" / "icons")
-VERSION = "0.9.6"
+VERSION = "0.9.7"
 DEVELOPER = "SolarFlare Developments"
 
 
 class SuperlionApplication(Adw.Application):
     def __init__(self):
-        super().__init__(application_id=config_mod.APP_ID, flags=Gio.ApplicationFlags.DEFAULT_FLAGS)
+        super().__init__(application_id=config_mod.APP_ID, flags=Gio.ApplicationFlags.HANDLES_OPEN)
         self._add_action("quit", lambda *_: self.quit(), ["<primary>q"])
         self._add_action("about", self._on_about)
         self._add_action("dedication", self._on_dedication)
@@ -57,6 +57,14 @@ class SuperlionApplication(Adw.Application):
             elif config.start_steam and not config.problems():
                 steam_control.start_if_needed(config)
         window.present()
+
+    def do_open(self, files, _n_files, _hint):
+        self.activate()
+        paths = [f.get_path() for f in files if f.get_path() and Path(f.get_path()).is_file()]
+        if paths:
+            self.props.active_window.add_to_steam(paths)
+        else:
+            self.props.active_window.toast("Only files on this computer can be added to Steam")
 
     def _on_preferences(self, *_):
         window = self.props.active_window
