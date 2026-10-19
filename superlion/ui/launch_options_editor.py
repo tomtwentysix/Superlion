@@ -32,7 +32,8 @@ def describe_warning(warning):
 
 
 def warning_row(title, warning, ignored, on_fix, on_ignore):
-    """A row for a warning, with buttons to fix it and to ignore it (on_ignore(ignore)); either can be None."""
+    """A row for a warning, with buttons to fix it (on_fix(remove)) and to ignore it (on_ignore(ignore)); either can be
+    None. An old name can be renamed or removed."""
     text = describe_warning(warning)
     row = Adw.ActionRow(
         title=GLib.markup_escape_text(title),
@@ -44,8 +45,13 @@ def warning_row(title, warning, ignored, on_fix, on_ignore):
     if on_fix:
         button = Gtk.Button(label=lo.fix_label(warning), valign=Gtk.Align.CENTER)
         button.add_css_class("flat")
-        button.connect("clicked", lambda *_: on_fix())
+        button.connect("clicked", lambda *_: on_fix(False))
         row.add_suffix(button)
+        if warning.rule == "rename":
+            button = Gtk.Button(label="Remove", valign=Gtk.Align.CENTER)
+            button.add_css_class("flat")
+            button.connect("clicked", lambda *_: on_fix(True))
+            row.add_suffix(button)
     if on_ignore:
         button = Gtk.Button(label="Stop Ignoring" if ignored else "Ignore", valign=Gtk.Align.CENTER)
         button.add_css_class("flat")
@@ -324,7 +330,7 @@ class LaunchOptionsEditor(Adw.Dialog):
             is_ignored = warning.id in ignored
             row = warning_row(
                 setting.title, warning, is_ignored,
-                lambda w=warning: self._fix(w),
+                lambda remove, w=warning: self._fix(w, remove),
                 (lambda ignore, w=warning: self._ignore(w, ignore)) if self.warnings_appid is not None else None,
             )
             target = self.rows.get(warning.key)
@@ -339,8 +345,8 @@ class LaunchOptionsEditor(Adw.Dialog):
                 icon.set_tooltip_text(describe_warning(warning))
         self.warning_group.set_visible(bool(found) and not self.search.get_text().split())
 
-    def _fix(self, warning):
-        options = lo.fix(self.text(), warning)
+    def _fix(self, warning, remove=False):
+        options = lo.fix(self.text(), warning, remove)
         self._set_text(options)
         self._read_text(options)
 

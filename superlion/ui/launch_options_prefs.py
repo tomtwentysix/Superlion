@@ -174,7 +174,7 @@ class LaunchOptionsPage(Adw.PreferencesPage):
             for warning in found:
                 expander.add_row(warning_row(
                     lo.setting_for(*warning.key).title, warning, warning.id in game_ignored,
-                    lambda a=appid, o=options, w=warning: self._fix(a, o, w),
+                    lambda remove, a=appid, o=options, w=warning: self._fix(a, o, w, remove),
                     lambda ignore, a=appid, w=warning: (lo.set_ignored(a, w, ignore), self.refresh()),
                 ))
             edit = Adw.ButtonRow(title="Edit Launch Options…")
@@ -189,8 +189,8 @@ class LaunchOptionsPage(Adw.PreferencesPage):
         else:
             self.expanded.discard(appid)
 
-    def _fix(self, appid, options, warning):
-        changes = {"launch_options": lo.fix(options, warning)}
+    def _fix(self, appid, options, warning, remove=False):
+        changes = {"launch_options": lo.fix(options, warning, remove)}
         self.window.apply_game_settings(appid, changes, lambda *_: self.refresh(), parent=self.dialog)
 
     def _build_global(self):
@@ -283,6 +283,8 @@ class LaunchOptionsPage(Adw.PreferencesPage):
             fix = lo.fix_label(active[0][2])
             label = {"Remove": "Remove From All Games", "Rename": "Rename in All Games"}.get(fix, f"{fix} in All Games")
             actions.append((label, lambda: self._confirm_fix(setting, fix, active)))
+            if fix == "Rename":
+                actions.append(("Remove From All Games", lambda: self._confirm_fix(setting, "Remove", active, True)))
         for label, callback in actions:
             button = Gtk.Button(child=Gtk.Label(label=label, xalign=0))
             button.add_css_class("flat")
@@ -294,16 +296,17 @@ class LaunchOptionsPage(Adw.PreferencesPage):
         row.add_suffix(menu)
         return row
 
-    def _confirm_fix(self, setting, fix, problems):
+    def _confirm_fix(self, setting, fix, problems, remove=False):
         """Apply each game's own fix for its warnings about the setting, in the games not ignoring them."""
         changes = {}
         for appid, options, warning in problems:
             current = changes.get(appid, {}).get("launch_options", options)
-            changes[appid] = {"launch_options": lo.fix(current, warning)}
+            changes[appid] = {"launch_options": lo.fix(current, warning, remove)}
         count = f"{len(changes)} game{'s' if len(changes) != 1 else ''}"
         alert = Adw.AlertDialog(
             heading=f"{fix} “{setting.title}” in {count.title()}?",
-            body=f"The launch options of {count} are changed as each game's warning suggests.",
+            body=f"“{setting.title}” is removed from the launch options of {count}." if remove
+            else f"The launch options of {count} are changed as each game's warning suggests.",
         )
         alert.add_response("cancel", "Cancel")
         alert.add_response("apply", fix)

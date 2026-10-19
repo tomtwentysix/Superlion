@@ -892,8 +892,9 @@ def fix_label(warning):
     return {"duplicate": "Keep Last", "rename": "Rename"}.get(warning.rule, "Remove")
 
 
-def fix(options, warning):
-    """The launch options with the warning's setting removed; a duplicate keeps its last value and an old name is replaced."""
+def fix(options, warning, remove=False):
+    """The launch options with the warning's setting removed; a duplicate keeps its last value and an old name is
+    replaced, unless remove is set."""
     parsed = parse(options, custom_programs())
     kind, key = warning.key
     if kind == ENV:
@@ -904,7 +905,7 @@ def fix(options, warning):
                 env.append((name, value))
             elif warning.rule == "duplicate" and i == last:
                 env.append((name, value))
-            elif warning.rule == "rename" and i == last and RENAMES[key][0] not in dict(parsed.env):
+            elif warning.rule == "rename" and not remove and i == last and RENAMES[key][0] not in dict(parsed.env):
                 env.append((RENAMES[key][0], value))
         parsed.env = env
     elif kind == WRAPPER:
