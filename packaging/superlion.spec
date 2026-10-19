@@ -1,5 +1,5 @@
 Name:           superlion
-Version:        0.9.1
+Version:        0.9.2
 Release:        1%{?dist}
 Summary:        Native GNOME front end for your Steam library
 License:        GPL-3.0-or-later
@@ -63,6 +63,12 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/uk.co.solarflareit.Su
 %{_datadir}/icons/hicolor/*/apps/uk.co.solarflareit.Superlion*
 
 %changelog
+* Mon Oct 19 2026 Tom <tom@solarflareit.co.uk> - 0.9.2-1
+- Simplify setup: lead with the Steam installation found and its package type, rename Steam's folder to the Steam Data Folder, explain what to do before anyone has signed in to Steam, and show Sunshine's status like the other pages. Move streaming settings to a Streaming page in Preferences. Start Steam only when needed for new installs, and say in Downloads when updates are paused because Steam is closed.
+- Group launch options more finely, warn about settings that conflict, rename misspelt and old names such as PROTON_ENABLE_HDR, and name games outside the library. Global Settings lists every setting by category with search and warnings. Edit DLL overrides and other lists one item per row, and choose audio outputs and other known values from drop-downs.
+- Share one game menu between the library and game pages, with a Manage submenu. Offer Update and Play when an update is waiting, and Check for Updates in Downloads.
+- Add a Store sidebar with lists, genres, the wishlist and the cart, a wishlist view, and adding to and removing from the wishlist without opening the web page.
+
 * Mon Oct 19 2026 Tom <tom@solarflareit.co.uk> - 0.9.1-1
 - Add While Streaming settings: stream on the main monitor or a dummy plug, which is turned off between streams; make a dummy plug act as a 4K, 1440p or 1080p HDR display with generated display information, kept after restarting; fix the resolution or match Moonlight; play sound straight to Sunshine or through EasyEffects; hide the dock and notifications while streaming. Prefer modes that reach the client's frame rate.
 
