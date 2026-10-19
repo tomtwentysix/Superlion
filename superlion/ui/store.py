@@ -108,7 +108,8 @@ class Capsule(Gtk.Button):
             label.add_css_class("caption")
             label.add_css_class("success" if item.get("discounted") else "dim-label")
             box.append(label)
-        self.set_child(box)
+        # Pictures ask for their image's size, which is twice the capsule's for sharpness.
+        self.set_child(Adw.Clamp(child=box, maximum_size=CAPSULE_W, tightening_threshold=CAPSULE_W))
         self.set_size_request(CAPSULE_W, -1)
         self.connect("clicked", lambda *_: on_open(item["id"], item.get("name", "")))
 
