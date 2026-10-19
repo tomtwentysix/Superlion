@@ -140,7 +140,7 @@ class SuperlionWindow(Adw.ApplicationWindow):
         header.pack_start(self.search_button)
         self.cart_button = Gtk.Button(icon_name="superlion-cart-symbolic", tooltip_text="Cart", visible=False)
         self.cart_button.connect(
-            "clicked", lambda *_: self.open_web("https://store.steampowered.com/cart", "Cart")
+            "clicked", lambda *_: self.store_view.show_cart()
         )
         header.pack_start(self.cart_button)
 
