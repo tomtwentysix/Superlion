@@ -1,17 +1,20 @@
 """Steam's downloads and updates, read from its app manifests and content log.
 
-Steam writes each app's state flags and byte counts to its appmanifest while it
-downloads, and logs the current download rate. Superlion only reads these;
-downloads are controlled in Steam itself.
+Steam writes each app's state flags and byte counts to its appmanifest, but
+rarely rewrites them mid-download, so a running download can still read as
+started-but-paused there. Its content log records every state change as it
+happens, so while Steam runs the log's latest state wins. Superlion only reads
+these; downloads are controlled in Steam itself.
 """
 
 import os
 import re
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from . import vdf
+from . import steam_control, vdf
 
 # Steam's app state flags (EAppState).
 UPDATE_REQUIRED = 2
@@ -25,6 +28,12 @@ COMMITTING = 1 << 22
 
 RATE_LINE = re.compile(r"^\[(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)\] Current download rate: ([\d.]+) Mbps")
 RATE_FRESH = 30  # seconds a logged rate is treated as current
+# e.g. "[2026-10-19 23:49:38] AppID 1088850 state changed : Update Required,Update Running,"
+STATE_LINE = re.compile(r"^\[[^]]+\] AppID (\d+) state changed : (.*)$")
+CLIENT_LINE = "] Client version: "  # logged once each time Steam starts
+
+_log_lock = threading.Lock()
+_log = {"path": None, "offset": 0, "states": {}}
 
 
 @dataclass
@@ -41,7 +50,7 @@ class Download:
 
     @property
     def fraction(self):
-        if self.total:
+        if self.total and (self.downloaded or not self.staged):
             return min(1.0, self.downloaded / self.total)
         if self.stage_total:
             return min(1.0, self.staged / self.stage_total)
@@ -62,12 +71,71 @@ def _status(flags):
     return None, None
 
 
+def _staged_on_disk(folder):
+    """Bytes allocated under a steamapps/downloading/<appid> folder.
+
+    Steam leaves the manifest's byte counts at 0 until a download stops, but
+    stages its files here as it goes. Allocated rather than apparent sizes,
+    since Steam writes chunks out of order into sparse files.
+    """
+    total = 0
+    for root, _dirs, files in os.walk(folder):
+        for name in files:
+            try:
+                total += os.lstat(os.path.join(root, name)).st_blocks * 512
+            except OSError:
+                pass
+    return total
+
+
+def _logged_states(config):
+    """{appid: set of state names} from the content log since Steam last started.
+
+    The log is read incrementally; it is rotated to content_log.previous.txt when large.
+    """
+    log = Path(config.steam_root) / "logs" / "content_log.txt"
+    with _log_lock:
+        try:
+            size = log.stat().st_size
+        except OSError:
+            return {}
+        if _log["path"] != log or size < _log["offset"]:
+            _log.update(path=log, offset=0, states={})
+        try:
+            with open(log, "rb") as fh:
+                fh.seek(_log["offset"])
+                chunk = fh.read()
+        except OSError:
+            return dict(_log["states"])
+        end = chunk.rfind(b"\n") + 1  # leave a half-written last line for next time
+        _log["offset"] += end
+        for line in chunk[:end].decode("utf-8", "replace").splitlines():
+            if CLIENT_LINE in line:
+                _log["states"].clear()
+            elif match := STATE_LINE.match(line):
+                names = {n.strip() for n in match.group(2).split(",")} - {""}
+                _log["states"][int(match.group(1))] = names
+        return dict(_log["states"])
+
+
+def _logged_status(names):
+    """The (status, detail) for an app's latest logged state names, as _status() returns."""
+    if "Update Running" in names:
+        return "downloading", "Downloading"
+    if "Update Paused" in names or "(Suspended)" in names:
+        return "paused", "Paused"
+    if names & {"Update Required", "Update Queued"}:
+        return "waiting", "Update waiting"
+    return None, None
+
+
 def scan(config, appids=None):
     """Apps with an active, paused or waiting download, across every enabled library.
 
     appids limits the scan to those apps, which is quicker for a single game.
     """
     found = {}
+    logged = _logged_states(config) if steam_control.is_running(config) else {}
     for folder in config.library_folders():
         steamapps = Path(folder) / "steamapps"
         manifests = (
@@ -86,12 +154,15 @@ def scan(config, appids=None):
                 appid = int(state.get("appid", "0") or 0)
             except ValueError:
                 continue
-            status, detail = _status(flags)
+            status, detail = _logged_status(logged[appid]) if appid in logged else _status(flags)
             if not status or not appid or appid in found:
                 continue
             number = lambda key: int(state.get(key, "0") or 0)  # noqa: E731
             if status == "paused" and not flags & UPDATE_REQUIRED and not number("BytesToDownload"):
                 continue  # A leftover paused flag with nothing to fetch; Steam does not list these.
+            staged = number("BytesStaged")
+            if status == "downloading" and not number("BytesDownloaded") and not staged:
+                staged = _staged_on_disk(steamapps / "downloading" / str(appid))
             found[appid] = Download(
                 appid=appid,
                 name=state.get("name", str(appid)),
@@ -99,7 +170,7 @@ def scan(config, appids=None):
                 detail=detail,
                 downloaded=number("BytesDownloaded"),
                 total=number("BytesToDownload"),
-                staged=number("BytesStaged"),
+                staged=staged,
                 stage_total=number("BytesToStage"),
                 scheduled=number("ScheduledAutoUpdate"),
             )

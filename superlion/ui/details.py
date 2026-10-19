@@ -381,7 +381,8 @@ class GameDetailsPage(Adw.NavigationPage):
     def _fill_menu(self, button):
         # Rebuilt each time, so check marks and Sunshine match the game's current state.
         menu, actions = game_menu(self.window, self.game, page=self)
-        self.insert_action_group("game", actions)
+        # On the button, as groups added to the page do not reach through the ToolbarView's ScrolledWindow.
+        button.insert_action_group("game", actions)
         button.set_menu_model(menu)
 
     @staticmethod
