@@ -3,12 +3,13 @@
 from gi.repository import Adw, Gio, GLib, Gtk
 
 from .. import (
-    auth, downloads, library, mod_managers, owned, pending, steam_control, steam_settings, store_api, sunshine,
+    auth, downloads, library, mod_managers, owned, pending, steam_control, steam_settings, store_api,
 )
 from . import images
 from .. import launch_options as lo
+from .artwork_picker import choose_file
 from .launch_options_editor import LaunchOptionsEditor, describe_warning
-from .library_view import collections_popover
+from .library_view import collections_popover, game_menu
 from .downloads_view import describe
 from .media import MediaCarousel, description_widgets, news_group
 
@@ -226,10 +227,12 @@ class GameDetailsPage(Adw.NavigationPage):
         self.download_area.set_visible(item.status != "waiting")
         self.download_bar.set_fraction(item.fraction)
         self.download_text.set_label(describe(item, rate))
-        # Greyed out like Steam's own button: the game cannot start until this finishes.
         self.primary.set_label(downloads.play_label(item, self.game.props.installed))
-        self.primary.set_sensitive(False)
-        self.primary.set_tooltip_text("Steam is handling this; see the Downloads tab for details")
+        busy = downloads.is_busy(item, self.game.props.installed)
+        # Greyed out like Steam's own button while the game cannot start; a waiting
+        # update is downloaded by Steam when the game is played.
+        self.primary.set_sensitive(not busy)
+        self.primary.set_tooltip_text("Steam is handling this; see the Downloads tab for details" if busy else None)
 
     def release(self):
         if getattr(self, "_download_timer", 0):
@@ -323,23 +326,7 @@ class GameDetailsPage(Adw.NavigationPage):
         images.load(path, 96, 60, thumb.set_paintable)
 
     def _choose_art(self, kind):
-        image_filter = Gtk.FileFilter(name="Images")
-        for mime in ("image/png", "image/jpeg"):
-            image_filter.add_mime_type(mime)
-        filters = Gio.ListStore.new(Gtk.FileFilter)
-        filters.append(image_filter)
-        dialog = Gtk.FileDialog(
-            title=f"Choose {library.ART_LABELS[kind]}", filters=filters, default_filter=image_filter
-        )
-
-        def done(dlg, result):
-            try:
-                source = dlg.open_finish(result).get_path()
-            except GLib.Error:
-                return  # Cancelled.
-            self.window.set_artwork(self.game, kind, source)
-
-        dialog.open(self.window, None, done)
+        choose_file(self.window, kind, lambda path: self.window.set_artwork(self.game, kind, path))
 
     def _reset_art(self, kind):
         config = self.window.config
@@ -369,7 +356,7 @@ class GameDetailsPage(Adw.NavigationPage):
             box.remove(child)
         game = self.game
         if game.props.installed:
-            primary = Gtk.Button(label="Play")
+            primary = Gtk.Button(label="Update and Play" if game.props.update_available else "Play")
             primary.connect("clicked", self._on_play)
         else:
             primary = Gtk.Button(label="Install")
@@ -386,45 +373,16 @@ class GameDetailsPage(Adw.NavigationPage):
                 tooltip=f"Open {manager.name}",
             ))
 
-        items = []
-        if game.props.store_appid:
-            items.append(("superlion-store-symbolic", "View in Store",
-                          lambda: self.window.open_store_app(game.props.store_appid, game.props.name)))
-        if game.props.installed and game.props.install_dir:
-            items.append(("folder-open-symbolic", "Browse Game Files", lambda: self._open_folder(game.props.install_dir)))
-            prefix = library.prefix_path(self.window.config, game)
-            if prefix:
-                items.append(("folder-open-symbolic", "Open Compatibility Files", lambda: self._open_folder(prefix)))
-            if sunshine.kind():
-                if sunshine.has(game):
-                    items.append(("video-display-symbolic", "Remove from Sunshine", self._remove_from_sunshine))
-                else:
-                    items.append(("video-display-symbolic", "Add to Sunshine", self._add_to_sunshine))
-        if items:
-            more = Gtk.MenuButton(
-                icon_name="view-more-symbolic", popover=self._icon_menu(items), tooltip_text="More",
-                valign=Gtk.Align.CENTER,
-            )
-            more.add_css_class("circular")
-            box.append(more)
+        more = Gtk.MenuButton(icon_name="view-more-symbolic", tooltip_text="More", valign=Gtk.Align.CENTER)
+        more.add_css_class("circular")
+        more.set_create_popup_func(self._fill_menu)
+        box.append(more)
 
-    @staticmethod
-    def _icon_menu(items):
-        """A menu whose items show icons, which standard GTK menus do not."""
-        popover = Gtk.Popover(has_arrow=True)
-        popover.add_css_class("menu")
-        popover.add_css_class("icon-menu")
-        column = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        for icon, label, callback in items:
-            row = Gtk.Box(spacing=12)
-            row.append(Gtk.Image(icon_name=icon))
-            row.append(Gtk.Label(label=label, xalign=0))
-            button = Gtk.Button(child=row)
-            button.add_css_class("flat")
-            button.connect("clicked", lambda _b, cb=callback: (popover.popdown(), cb()))
-            column.append(button)
-        popover.set_child(column)
-        return popover
+    def _fill_menu(self, button):
+        # Rebuilt each time, so check marks and Sunshine match the game's current state.
+        menu, actions = game_menu(self.window, self.game, page=self)
+        self.insert_action_group("game", actions)
+        button.set_menu_model(menu)
 
     @staticmethod
     def _pill(icon, label, callback, tooltip=None):
@@ -602,32 +560,6 @@ class GameDetailsPage(Adw.NavigationPage):
 
     def _on_play(self, _button):
         self._open(self.game.run_uri, f"Launching {self.game.props.name}")
-
-    def _add_to_sunshine(self):
-        name = self.game.props.name
-        try:
-            restarted = sunshine.add(self.window.config, self.game)
-        except OSError as error:
-            self.window.toast(f"{name} could not be added to Sunshine: {error.strerror}")
-            return
-        self._fill_actions()
-        if restarted or not sunshine.is_running():
-            self.window.toast(f"{name} added to Sunshine")
-        else:
-            self.window.toast(f"{name} added. Restart Sunshine after this stream to see it in Moonlight.")
-
-    def _remove_from_sunshine(self):
-        name = self.game.props.name
-        try:
-            restarted = sunshine.remove(self.game)
-        except OSError as error:
-            self.window.toast(f"{name} could not be removed from Sunshine: {error.strerror}")
-            return
-        self._fill_actions()
-        if restarted or not sunshine.is_running():
-            self.window.toast(f"{name} removed from Sunshine")
-        else:
-            self.window.toast(f"{name} removed. Restart Sunshine after this stream to remove it from Moonlight.")
 
     def _on_install(self, _button):
         self.window.install_game(self.game.props.appid, self.game.props.name)

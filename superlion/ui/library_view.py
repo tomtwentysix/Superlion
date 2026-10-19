@@ -2,7 +2,7 @@
 
 from gi.repository import Adw, Gio, GLib, Gtk, Pango
 
-from .. import downloads, game_collections, library, mod_managers, owned
+from .. import downloads, game_collections, library, mod_managers, owned, sunshine
 from . import images
 
 COVER_W, COVER_H = 150, 225
@@ -133,10 +133,15 @@ class LibraryTile(Gtk.Box):
         popover.popup()
 
 
-def game_menu(window, game):
-    """The right-click menu for a game, and the "game" action group it uses."""
+def game_menu(window, game, page=None):
+    """A game's menu, and the "game" action group it uses.
+
+    The library's right-click menu and the ⋮ menu on a game's page (page) share
+    it. The page has its own Play and mod manager buttons, so those are left out there.
+    """
     actions = Gio.SimpleActionGroup()
     appid = game.props.appid
+    installed = game.props.installed
 
     def action(name, callback):
         act = Gio.SimpleAction.new(name, None)
@@ -149,44 +154,29 @@ def game_menu(window, game):
         actions.add_action(act)
 
     menu = Gio.Menu()
-    main = Gio.Menu()
-    download = None if game.props.non_steam else downloads.state_for(window.config, appid)
-    if download is not None:
-        # Shown greyed out, as the game cannot start or install until Steam finishes.
-        main.append(downloads.play_label(download, game.props.installed), "game.busy")
-        busy = Gio.SimpleAction.new("busy", None)
-        busy.set_enabled(False)
-        actions.add_action(busy)
-    elif game.props.installed:
-        main.append("Play", "game.play")
-        action("play", lambda: window.launch(game.run_uri, f"Launching {game.props.name}"))
-    else:
-        main.append("Install", "game.install")
-        action("install", lambda: window.install_game(appid, game.props.name))
-    main.append("Show Details", "game.details")
-    action("details", lambda: window.open_game(game))
-    if game.props.store_appid:
-        main.append("View in Store", "game.store")
-        action("store", lambda: window.open_store_app(game.props.store_appid, game.props.name))
-    if game.props.non_steam:
-        main.append("Rename…", "game.rename")
-        action("rename", lambda: window.rename_game(game))
-        main.append("Match to Steam Game…", "game.match")
-        action("match", lambda: window.open_match_dialog(game))
-    main.append("Choose Cover from SteamGridDB…", "game.steamgriddb")
-    action("steamgriddb", lambda: window.open_artwork_picker(game, "cover"))
-    menu.append_section(None, main)
-
-    places = Gio.Menu()
-    if game.props.installed and game.props.install_dir:
-        places.append("Browse Game Files", "game.folder")
-        action("folder", lambda: window.open_folder(game.props.install_dir))
-        prefix = library.prefix_path(window.config, game)
-        if prefix:
-            places.append("Open Compatibility Files", "game.prefix")
-            action("prefix", lambda: window.open_folder(prefix))
-    if places.get_n_items():
-        menu.append_section(None, places)
+    if page is None:
+        main = Gio.Menu()
+        download = None if game.props.non_steam else downloads.state_for(window.config, appid)
+        if downloads.is_busy(download, installed):
+            # Shown greyed out, as the game cannot start or install until Steam finishes.
+            main.append(downloads.play_label(download, installed), "game.busy")
+            busy = Gio.SimpleAction.new("busy", None)
+            busy.set_enabled(False)
+            actions.add_action(busy)
+        elif installed:
+            # Steam downloads a waiting update first, then starts the game.
+            main.append("Update and Play" if download or game.props.update_available else "Play", "game.play")
+            action("play", lambda: window.launch(game.run_uri, f"Launching {game.props.name}"))
+        else:
+            main.append("Install", "game.install")
+            action("install", lambda: window.install_game(appid, game.props.name))
+        manager = mod_managers.linked(appid)
+        if manager is not None:
+            main.append(f"Launch {manager.name}", "game.mod-manager")
+            action("mod-manager", lambda: window.launch_mod_manager(manager))
+        main.append("Show Details", "game.details")
+        action("details", lambda: window.open_game(game))
+        menu.append_section(None, main)
 
     organise = Gio.Menu()
     collections = window.library.collections.values()
@@ -194,7 +184,6 @@ def game_menu(window, game):
     organise.append("Favourite", "game.favourite")
     toggle("favourite", bool(favourites and appid in favourites.appids),
            lambda on: window.set_favourite(game, on))
-
     submenu = Gio.Menu()
     choices = [c for c in collections if not game_collections.is_fixed(c)]
     for index, collection in enumerate(sorted(choices, key=lambda c: (c.source != "steam", c.name.casefold()))):
@@ -206,18 +195,44 @@ def game_menu(window, game):
     action("new-collection", lambda: window.new_collection(game))
     submenu.append_section(None, new)
     organise.append_submenu("Add to Collection", submenu)
-    menu.append_section(None, organise)
-
-    manager = mod_managers.linked(appid)
-    if manager is not None:
-        launch_section = Gio.Menu()
-        launch_section.append(f"Launch {manager.name}", "game.mod-manager")
-        action("mod-manager", lambda: window.launch_mod_manager(manager))
-        menu.insert_section(1, None, launch_section)
     if game.props.non_steam:
         organise.append("Mod Manager", "game.is-manager")
         toggle("is-manager", appid in mod_managers.shortcut_ids(),
                lambda on: window.set_mod_manager_shortcut(game, on))
+    menu.append_section(None, organise)
+
+    manage = Gio.Menu()
+    settings = Gio.Menu()
+    settings.append("Launch Options…", "game.launch-options")
+    action("launch-options", page._edit_launch_options if page else lambda: window.edit_launch_options(game))
+    if installed and sunshine.kind():
+        listed = sunshine.has(game)
+        settings.append("Remove From Sunshine" if listed else "Add to Sunshine", "game.sunshine")
+        action("sunshine", lambda: window.set_in_sunshine(game, not listed))
+    settings.append("Choose Cover…", "game.cover")
+    action("cover", lambda: window.open_artwork_picker(game, "cover"))
+    if game.props.non_steam:
+        settings.append("Rename…", "game.rename")
+        action("rename", lambda: window.rename_game(game))
+        settings.append("Match to Steam Game…", "game.match")
+        action("match", lambda: window.open_match_dialog(game))
+    manage.append_section(None, settings)
+    places = Gio.Menu()
+    if installed and game.props.install_dir:
+        places.append("Browse Game Files", "game.folder")
+        action("folder", lambda: window.open_folder(game.props.install_dir))
+        prefix = library.prefix_path(window.config, game)
+        if prefix:
+            places.append("Open Compatibility Files", "game.prefix")
+            action("prefix", lambda: window.open_folder(prefix))
+    if game.props.store_appid:
+        places.append("View in Store", "game.store")
+        action("store", lambda: window.open_store_app(game.props.store_appid, game.props.name))
+    if places.get_n_items():
+        manage.append_section(None, places)
+    manage_section = Gio.Menu()
+    manage_section.append_submenu("Manage", manage)
+    menu.append_section(None, manage_section)
 
     visibility = Gio.Menu()
     hidden = appid in window.library.hidden_ids

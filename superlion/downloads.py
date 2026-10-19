@@ -131,6 +131,18 @@ def state_for(config, appid):
     return items[0] if items else None
 
 
+def is_busy(item, installed=True):
+    """Whether Steam's download stops the game starting; a waiting update is fetched when it is played."""
+    return item is not None and not (item.status == "waiting" and installed)
+
+
+def cover_label(item, installed=True):
+    """What a game's cover says about a download, such as "Updating 42%" or "Update Available"."""
+    if item.status == "waiting" and installed:
+        return "Update Available"
+    return play_label(item, installed)
+
+
 def play_label(item, installed=True):
     """What a Play button should say while a game downloads, e.g. "Updating 42%"."""
     if item.status == "downloading":
@@ -138,4 +150,4 @@ def play_label(item, installed=True):
         return f"{verb} {round(item.fraction * 100)}%" if item.total or item.stage_total else f"{verb}…"
     if item.status == "paused":
         return "Update Paused" if installed else "Install Paused"
-    return "Update Queued"
+    return "Update and Play" if installed else "Install Queued"

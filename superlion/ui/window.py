@@ -3,7 +3,8 @@
 from gi.repository import Adw, Gio, GLib, GObject, Gtk
 
 from .. import (
-    appinfo, auth, game_collections, library, mod_managers, owned, pending, steam_control, steam_match, sunshine,
+    appinfo, auth, game_collections, library, mod_managers, owned, pending, steam_control, steam_match,
+    steam_settings, sunshine,
 )
 from .. import config as config_mod
 from .. import display
@@ -11,6 +12,7 @@ from . import images
 from .details import GameDetailsPage
 from .downloads_view import DownloadsView
 from .install_dialog import install_game
+from .launch_options_editor import LaunchOptionsEditor
 from .library_view import GROUP_TITLES, LibraryView
 from .store import StoreAppPage, StoreView
 from .steam_key_setup import SteamKeyDialog
@@ -31,7 +33,6 @@ headerbar.hero-header.start-light button.hero-back,
 headerbar.hero-header.start-light windowcontrols.start button,
 headerbar.hero-header.end-light windowcontrols.end button { color: rgba(0, 0, 0, 0.8); }
 /* Menu items built from buttons use the normal weight of standard menu items. */
-.icon-menu button label { font-weight: normal; }
 """
 
 
@@ -770,6 +771,35 @@ class SuperlionWindow(Adw.ApplicationWindow):
 
     def open_website(self, url):
         Gtk.UriLauncher(uri=url).launch(self, None, None)
+
+    def refresh_updates(self):
+        """Compare installed builds with Steam's app database again."""
+        if self.config:
+            library.apply_metadata(self.installed, appinfo.load(self.config.root))
+
+    def edit_launch_options(self, game):
+        appid = game.props.appid
+        options = pending.get(appid).get("launch_options")
+        if options is None:
+            try:
+                options = steam_settings.read_launch_options(self.config, appid)
+            except OSError:
+                options = ""
+        LaunchOptionsEditor(self, options, game_name=game.props.name, appid=appid).present(self)
+
+    def set_in_sunshine(self, game, add):
+        name = game.props.name
+        try:
+            restarted = sunshine.add(self.config, game) if add else sunshine.remove(game)
+        except OSError as error:
+            self.toast(f"{name} could not be {'added to' if add else 'removed from'} Sunshine: {error.strerror}")
+            return
+        if restarted or not sunshine.is_running():
+            self.toast(f"{name} {'added to' if add else 'removed from'} Sunshine")
+        elif add:
+            self.toast(f"{name} added. Restart Sunshine after this stream to see it in Moonlight.")
+        else:
+            self.toast(f"{name} removed. Restart Sunshine after this stream to remove it from Moonlight.")
 
     def open_artwork_picker(self, game, kind):
         from .artwork_picker import ArtworkPicker

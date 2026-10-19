@@ -47,6 +47,11 @@ class Game(GObject.Object):
     # Steam download state shown on the cover, e.g. "Updating 42%"; "" when none.
     download_label = GObject.Property(type=str, default="")
     download_progress = GObject.Property(type=float, default=-1.0)  # -1 when not downloading
+    # The installed build and its branch, from the app manifest, and whether Steam
+    # has a newer build of that branch.
+    build_id = GObject.Property(type=GObject.TYPE_INT64)
+    branch = GObject.Property(type=str, default="public")
+    update_available = GObject.Property(type=bool, default=False)
     cover = GObject.Property(type=str)
     hero = GObject.Property(type=str)
     logo = GObject.Property(type=str)
@@ -136,6 +141,8 @@ def load_installed(config):
                 install_dir=str(steamapps / "common" / state.get("installdir", "")),
                 library=str(folder),
                 last_played=played,
+                build_id=int(state.get("buildid", "0") or 0),
+                branch=(state.get("UserConfig") or {}).get("BetaKey") or "public",
                 **find_art(config.root, config.userdata, appid),
             )
     return list(games.values())
@@ -321,6 +328,10 @@ def apply_metadata(games, metadata):
             game.props.release_date = info.get("release", 0)
             game.props.genres = info.get("genres", [])
             game.props.vr = info.get("vr", 0)
+            latest = info.get("builds", {}).get(game.props.branch, 0)
+            game.props.update_available = bool(
+                game.props.installed and game.props.build_id and latest > game.props.build_id
+            )
 
 
 def group_keys(game, mode):

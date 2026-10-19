@@ -12,7 +12,7 @@ from pathlib import Path
 
 from . import config as config_mod
 
-CACHE_VERSION = 4  # Raised when the extracted fields change, so old caches are rebuilt.
+CACHE_VERSION = 5  # Raised when the extracted fields change, so old caches are rebuilt.
 
 VR_NONE, VR_SUPPORTED, VR_REQUIRED = 0, 1, 2
 # Store categories: 31 "VR Support" (older), 53 "VR Supported", 54 "VR Only".
@@ -131,6 +131,7 @@ def _parse(data):
             "genres": [GENRES[int(g)] for g in genre_ids if str(g).isdigit() and int(g) in GENRES],
             "installdir": str((info.get("config") or {}).get("installdir", "")),
             "download_size": _download_size(info.get("depots") or {}),
+            "builds": _builds(info.get("depots") or {}),
         }
         pos = start + size
     return apps
@@ -165,6 +166,15 @@ def _download_size(depots):
         for k, d in depots.items()
     )
     return by_os["linux"] if linux_only else by_os["windows"]
+
+
+def _builds(depots):
+    """The latest build ID of each branch, such as {"public": 18620411}."""
+    branches = depots.get("branches") or {}
+    return {
+        name: int(branch["buildid"]) for name, branch in branches.items()
+        if isinstance(branch, dict) and str(branch.get("buildid", "")).isdigit()
+    }
 
 
 def _vr_level(common):
