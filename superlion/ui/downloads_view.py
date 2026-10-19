@@ -71,6 +71,9 @@ class DownloadsView(Gtk.Box):
             self.groups[status] = group
             self.prefs.add(group)
         open_group = Adw.PreferencesGroup()
+        check = Adw.ButtonRow(title="Check for Updates", start_icon_name="view-refresh-symbolic")
+        check.connect("activated", lambda *_: self.check_for_updates())
+        open_group.add(check)
         open_steam = Adw.ButtonRow(title="Open Downloads in Steam", end_icon_name="superlion-external-link-symbolic")
         open_steam.connect("activated", lambda *_: window.launch("steam://open/downloads", "Opening Steam's downloads"))
         open_group.add(open_steam)
@@ -81,10 +84,17 @@ class DownloadsView(Gtk.Box):
             icon_name="folder-download-symbolic", title="No Downloads",
             description="Games you install or update in Steam appear here while they download.",
         )
-        open_button = Gtk.Button(label="Open Downloads in Steam", halign=Gtk.Align.CENTER)
+        buttons = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, halign=Gtk.Align.CENTER)
+        check_button = Gtk.Button(label="Check for Updates")
+        check_button.add_css_class("pill")
+        check_button.add_css_class("suggested-action")
+        check_button.connect("clicked", lambda *_: self.check_for_updates())
+        open_button = Gtk.Button(label="Open Downloads in Steam")
         open_button.add_css_class("pill")
         open_button.connect("clicked", lambda *_: window.launch("steam://open/downloads", "Opening Steam's downloads"))
-        empty.set_child(open_button)
+        buttons.append(check_button)
+        buttons.append(open_button)
+        empty.set_child(buttons)
         self.stack.add_named(empty, "empty")
         self.append(self.stack)
 
@@ -117,6 +127,19 @@ class DownloadsView(Gtk.Box):
             self._show,
         )
 
+    def check_for_updates(self):
+        """Steam checks for updates when it starts and while it runs, so start it if needed."""
+        config = self.window.config
+        if steam_control.start_if_needed(config):
+            self.closed_banner.set_revealed(False)
+            self.window.toast("Starting Steam, which checks for updates")
+            # Steam's app database is updated a little after it starts.
+            GLib.timeout_add_seconds(60, lambda: (self.window.refresh_updates(), self.refresh(), GLib.SOURCE_REMOVE)[-1])
+        else:
+            self.window.toast("Steam checks for updates while it runs. Updates it finds are listed here.")
+        self.window.refresh_updates()
+        self.refresh()
+
     def _on_start_steam(self, banner):
         banner.set_revealed(False)
         steam_control.start(self.window.config)
@@ -127,7 +150,10 @@ class DownloadsView(Gtk.Box):
         for index in range(store.get_n_items()):
             game = store.get_item(index)
             item = states.get(game.props.appid) if not game.props.non_steam else None
-            label = downloads.play_label(item, game.props.installed) if item else ""
+            if item:
+                label = downloads.cover_label(item, game.props.installed)
+            else:
+                label = "Update Available" if game.props.update_available else ""
             progress = item.fraction if item and item.status != "waiting" else -1.0
             if game.props.download_label != label:
                 game.props.download_label = label
@@ -141,6 +167,12 @@ class DownloadsView(Gtk.Box):
         items, rate, running = result
         self.closed_banner.set_revealed(not running)
         self._update_games(items)
+        # Games with a newer build that Steam has not marked yet.
+        listed = {item.appid for item in items}
+        items += [
+            downloads.Download(g.props.appid, g.props.name, "waiting", "Update available", 0, 0, 0, 0, 0)
+            for g in self.window.installed if g.props.update_available and g.props.appid not in listed
+        ]
         # Covers in the library show live progress, so check often while downloading.
         self._schedule(fast=self.visible or any(i.status == "downloading" for i in items))
         if self.page is not None:

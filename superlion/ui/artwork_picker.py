@@ -1,6 +1,6 @@
-"""Choosing artwork from SteamGridDB inside the app."""
+"""Choosing artwork from SteamGridDB inside the app, or from a file."""
 
-from gi.repository import Adw, GObject, Gtk, Pango
+from gi.repository import Adw, Gio, GLib, GObject, Gtk, Pango
 
 from .. import auth, library, sgdb
 from . import images
@@ -10,8 +10,27 @@ THUMBS = {"cover": (120, 180), "header": (230, 108), "hero": (320, 103), "logo":
 PAGE_SIZE = 50  # SteamGridDB returns up to 50 images per page.
 
 
+def choose_file(parent, kind, callback):
+    """Ask for an image file of artwork; callback(path) once one is chosen."""
+    image_filter = Gtk.FileFilter(name="Images")
+    for mime in ("image/png", "image/jpeg"):
+        image_filter.add_mime_type(mime)
+    filters = Gio.ListStore.new(Gtk.FileFilter)
+    filters.append(image_filter)
+    dialog = Gtk.FileDialog(title=f"Choose {library.ART_LABELS[kind]}", filters=filters, default_filter=image_filter)
+
+    def done(dlg, result):
+        try:
+            path = dlg.open_finish(result).get_path()
+        except GLib.Error:
+            return  # Cancelled.
+        callback(path)
+
+    dialog.open(parent, None, done)
+
+
 class ArtworkPicker(Adw.Dialog):
-    """Shows SteamGridDB artwork of one kind; emits "chosen" with the downloaded path."""
+    """Shows SteamGridDB artwork of one kind, and offers a file instead; emits "chosen" with the image's path."""
 
     __gsignals__ = {"chosen": (GObject.SignalFlags.RUN_FIRST, None, (str,))}
 
@@ -34,6 +53,10 @@ class ArtworkPicker(Adw.Dialog):
         self.stack.add_named(self.message, "message")
 
         header = Adw.HeaderBar()
+        from_file = Gtk.Button(label="From File…")
+        from_file.connect("clicked", lambda *_: choose_file(
+            window, kind, lambda path: (self.emit("chosen", path), self.close())))
+        header.pack_start(from_file)
         menu = Gtk.MenuButton(icon_name="open-menu-symbolic", tooltip_text="More Options")
         popover_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, margin_top=6, margin_bottom=6,
                               margin_start=6, margin_end=6)

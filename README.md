@@ -13,13 +13,13 @@ Superlion is dedicated to the memory of John Wharton of S J Wharton Ltd (1953–
 - A sidebar with views (All Games, Installed, Not Installed, VR Games, Non-Steam Games, Mod Managers), Steam's own collections, and your own collections.
 - Search that ignores case, punctuation and ™, and matches initials (“re3” finds *Resident Evil 3*) and app IDs.
 - Sort by name, size, last played or release date, and group by genre, release year or installed state.
-- A right-click menu on every game: play or install, details, store page, game and compatibility files, favourite, collections, and hide.
+- A right-click menu on every game, the same as the **⋮** menu on its page: play or install, details, favourite and collections, a **Manage** submenu (launch options, Sunshine, cover, game and compatibility files, store page), and hide.
 
 ### Game pages
 - **Overview**: trailers, screenshots, description and developer updates from the Steam store.
 - **Information**: install size, location, compatibility files (the Proton prefix), release date, genres, VR support, collections, a linked mod manager, and artwork.
 - **Steam Settings**: launch options and compatibility tool (Proton version).
-- **Play**, **Launch Mod Manager** when a mod manager is linked, and a **⋮** menu with View in Store, Browse Game Files, Open Compatibility Files and Add to Sunshine.
+- **Play**, **Launch Mod Manager** when a mod manager is linked, and the game's **⋮** menu. **Choose Cover…** offers SteamGridDB artwork or a file.
 
 ### Non-Steam games
 - Rename them; suggestions from the Steam store fill in a game's exact name.
@@ -46,7 +46,9 @@ Superlion is dedicated to the memory of John Wharton of S J Wharton Ltd (1953–
 
 ### Downloads
 - Steam's downloads and updates, read from its own files: downloading (with progress and the current download rate), paused, and updates waiting with their scheduled time. The tab shows a count of them.
-- Games that are downloading show their state on their cover and game page: **Play** becomes “Updating 42%”, “Update Paused” or “Update Queued” and is greyed out until Steam finishes, with a progress bar, amount downloaded and current speed.
+- Games that are downloading show their state on their cover and game page: **Play** becomes “Updating 42%” or “Update Paused” and is greyed out until Steam finishes, with a progress bar, amount downloaded and current speed.
+- A game with an update waiting, or a newer build in Steam's app database than the one installed, shows “Update Available” on its cover, and **Play** becomes **Update and Play**: Steam downloads the update, then starts the game.
+- **Check for Updates** starts Steam hidden if it is closed, as Steam checks for updates when it starts and while it runs.
 
 ### Store
 - Native store browsing, search and game pages, with prices in your Steam profile's country (or the United Kingdom's when it shows none).
