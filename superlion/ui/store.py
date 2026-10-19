@@ -227,7 +227,6 @@ class StoreView(Gtk.Box):
         self.refresh_counts()
 
     def refresh_counts(self):
-        """Count the wishlist and cart for the sidebar."""
         config, region = self.window.config, self.window.store_region
         if config is None or not config.account_id:
             return

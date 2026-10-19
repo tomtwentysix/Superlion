@@ -200,7 +200,6 @@ class ListValue:
 
 
 def value_editor(expander, setting, value, on_change):
-    """The editor that suits a setting's value."""
     title = "Options" if setting.kind == lo.WRAPPER else "Value"
     if setting.kind == lo.ENV and setting.key == "WINEDLLOVERRIDES":
         return ListValue(expander, value, ";", [], on_change, dlls=True)
