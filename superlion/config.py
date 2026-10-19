@@ -47,8 +47,9 @@ class Config:
     # Library folders added by hand in the wizard.
     extra_libraries: list = field(default_factory=list)
     sign_in_skipped: bool = False
-    # Start Steam, hidden, when Superlion opens.
-    start_steam: bool = True
+    # Start Steam, hidden, when Superlion opens. Off for new installs: playing,
+    # installing and streaming start Steam when needed.
+    start_steam: bool = False
     # Sunshine streams: the connector games are shown on ("" for the primary monitor),
     # its resolution ("" to match the client, or such as "1920x1080"), whether games
     # play "direct" to Sunshine or through "easyeffects", and whether the dock and
@@ -89,7 +90,9 @@ class Config:
         """Human-readable reasons the saved configuration no longer works."""
         issues = []
         if not steam_paths.is_steam_root(self.steam_root):
-            issues.append(f"The Steam folder {self.steam_root} could not be found.")
+            issues.append("Steam's data folder could not be found.")
+        elif not self.account_id:
+            issues.append("Sign in to Steam, then choose your account in Preferences.")
         elif not self.userdata.is_dir():
             issues.append("The selected Steam account has no data folder.")
         for folder in self.library_folders():

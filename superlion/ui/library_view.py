@@ -449,7 +449,7 @@ class LibraryView(Adw.Bin):
         )
         self.content_stack.add_named(
             Adw.StatusPage(icon_name="applications-games-symbolic", title="Steam Not Found",
-                           description="Run setup from the main menu to choose your Steam folder."),
+                           description="Run setup from the main menu to choose where Steam is installed."),
             "missing",
         )
         self.managers_page = Adw.PreferencesPage()

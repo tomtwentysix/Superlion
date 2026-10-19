@@ -3,6 +3,7 @@
 from gi.repository import Adw, GLib, Gtk
 
 from .. import audio, display, edid, sunshine
+from .status_header import StatusHeader
 
 COPR_URL = "https://copr.fedorainfracloud.org/coprs/lizardbyte/stable/"
 
@@ -28,10 +29,14 @@ PROBLEMS = {
 
 class SunshineGroup(Adw.PreferencesGroup):
     def __init__(self):
-        super().__init__(
-            title="Sunshine",
-            description="Streams your games to Moonlight on a TV, phone or another computer.",
-        )
+        super().__init__(margin_bottom=12)
+        self.header = StatusHeader("tv-symbolic", "", icon_size=64)
+        self.button = Gtk.Button(halign=Gtk.Align.CENTER)
+        self.button.add_css_class("pill")
+        self.button.add_css_class("suggested-action")
+        self.button.connect("clicked", self._on_button)
+        self.header.append(self.button)
+        self.add(self.header)
         self._rows = []
         self.refresh()
 
@@ -39,33 +44,53 @@ class SunshineGroup(Adw.PreferencesGroup):
         for row in self._rows:
             self.remove(row)
         self._rows = []
+        self.button.set_sensitive(True)
         issues = sunshine.problems()
         if not issues:
-            self._add("emblem-ok-symbolic", "Ready to Stream",
-                      "Games stream in HDR and surround sound. Add one with Add to Sunshine in its ⋮ menu.")
+            self.header.update("tv-symbolic", "Sunshine Is Ready",
+                               "Add a game with Add to Sunshine in its menu, then play it in Moonlight.")
+            self.button.set_visible(False)
             return
-        for issue in issues:
+        title, description, action = PROBLEMS[issues[0]]
+        self.header.update("dialog-warning-symbolic", title, description)
+        self._action = action
+        self.button.set_label("Start Sunshine" if action == "start" else "Get Sunshine")
+        self.button.set_visible(True)
+        for issue in issues[1:]:
             title, subtitle, action = PROBLEMS[issue]
-            row = self._add("dialog-warning-symbolic", title, subtitle)
-            if action == "start":
-                button = Gtk.Button(label="Start", valign=Gtk.Align.CENTER)
-                button.connect("clicked", self._on_start)
-            else:
-                button = Gtk.LinkButton(uri=COPR_URL, label="Get Sunshine", valign=Gtk.Align.CENTER)
-            row.add_suffix(button)
+            row = Adw.ActionRow(title=title, subtitle=subtitle)
+            row.add_prefix(Gtk.Image(icon_name="dialog-warning-symbolic"))
+            if action == "get":
+                row.add_suffix(Gtk.LinkButton(uri=COPR_URL, label="Get Sunshine", valign=Gtk.Align.CENTER))
+            self.add(row)
+            self._rows.append(row)
 
-    def _add(self, icon, title, subtitle):
-        row = Adw.ActionRow(title=title, subtitle=subtitle)
-        row.add_prefix(Gtk.Image(icon_name=icon))
-        self.add(row)
-        self._rows.append(row)
-        return row
-
-    def _on_start(self, button):
+    def _on_button(self, button):
+        if self._action == "get":
+            Gtk.UriLauncher(uri=COPR_URL).launch(self.get_root(), None, None)
+            return
         button.set_sensitive(False)
         sunshine.start()
         # Sunshine's service waits a few seconds for the desktop before it starts.
         GLib.timeout_add_seconds(8, lambda: (self.refresh(), GLib.SOURCE_REMOVE)[-1])
+
+
+def status_text():
+    issues = sunshine.problems()
+    return PROBLEMS[issues[0]][0] if issues else "Ready"
+
+
+def display_label(connector):
+    """How a Stream Display choice is named, such as "Main Monitor" or "Dummy Plug (HDMI-1)"."""
+    if not connector:
+        return "Main Monitor"
+    try:
+        others = display.monitors()
+    except GLib.Error:
+        others = {}
+    if connector not in others:
+        return f"{connector} (Not Connected)"
+    return f"{'Dummy Plug' if edid.override(connector) else others[connector]} ({connector})"
 
 
 RESOLUTIONS = [
@@ -76,8 +101,8 @@ RESOLUTIONS = [
     ("1280x720", "720p (1280 × 720)"),
 ]
 SOUND = [
-    ("direct", "Surround, Without EasyEffects"),
-    ("easyeffects", "Through EasyEffects, in Stereo"),
+    ("direct", "Surround"),
+    ("easyeffects", "Stereo with EasyEffects"),
 ]
 
 
@@ -102,11 +127,9 @@ class StreamOptions(Adw.PreferencesGroup):
             others = display.monitors()
         except GLib.Error:
             others = {}
-        displays = [("", "Main Monitor")] + [
-            (c, f"{'Dummy Plug' if edid.override(c) else name} ({c})") for c, name in others.items()
-        ]
+        displays = [(c, display_label(c)) for c in ["", *others]]
         if state.stream_display and state.stream_display not in others:
-            displays.append((state.stream_display, f"{state.stream_display} (Not Connected)"))
+            displays.append((state.stream_display, display_label(state.stream_display)))
         self.add(_combo(
             "Stream Display",
             "A dummy plug gives streams a display of their own" if others
@@ -132,12 +155,12 @@ class StreamOptions(Adw.PreferencesGroup):
         ))
         if audio.installed():
             self.add(_combo(
-                "Sound", "EasyEffects mixes games down to stereo",
+                "Sound", "Surround leaves out EasyEffects, so games reach Moonlight unchanged",
                 SOUND, state.stream_audio, lambda v: setattr(state, "stream_audio", v),
             ))
         quiet = Adw.SwitchRow(
             title="Hide Dock and Notifications",
-            subtitle="Keeps Dash to Dock and notification banners off the stream",
+            subtitle="Hides the dock and pop-up notifications while a game is streaming",
             active=state.stream_quiet,
         )
         quiet.connect("notify::active", lambda row, _p: setattr(state, "stream_quiet", row.get_active()))

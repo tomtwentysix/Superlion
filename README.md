@@ -53,13 +53,14 @@ Superlion is dedicated to the memory of John Wharton of S J Wharton Ltd (1953–
 - Buying, the cart and the wishlist open Steam's web pages inside the app.
 
 ### Steam in the background
-- Superlion starts Steam hidden when it opens, and whenever it starts or restarts Steam, so games, downloads and installs work without Steam's window appearing. Steam's window only opens for its own pages, such as **Open Downloads in Steam**. Turn this off in **Preferences → Steam → Start Steam With Superlion**.
+- Playing, installing and streaming a game start Steam hidden, so they work without Steam's window appearing. Steam's window only opens for its own pages, such as **Open Downloads in Steam**.
+- **Preferences → Steam → Start Steam With Superlion** keeps Steam running in the background from when Superlion opens, so games stay updated and start faster. While Steam is closed, the Downloads tab says that updates are paused and offers to start it.
 
 ### Streaming with Sunshine
-- **Add to Sunshine** in a game's **⋮** menu lists it in [Sunshine](https://github.com/LizardByte/Sunshine), so Moonlight can start it. Setup and **Preferences → Steam** show whether Sunshine is installed, running and able to stream HDR, which needs Sunshine from [LizardByte's COPR](https://copr.fedorainfracloud.org/coprs/lizardbyte/stable/) rather than the Flatpak or AppImage.
+- **Add to Sunshine** in a game's **⋮** menu lists it in [Sunshine](https://github.com/LizardByte/Sunshine), so Moonlight can start it. Setup and **Preferences → Streaming** show whether Sunshine is installed, running and able to stream HDR, which needs Sunshine from [LizardByte's COPR](https://copr.fedorainfracloud.org/coprs/lizardbyte/stable/) rather than the Flatpak or AppImage.
 - **Stream Display** shows games on the main monitor, which switches to each stream's resolution, refresh rate and HDR or SDR while other monitors are turned off, or on a dummy plug, which leaves your monitors as they are and keeps your windows off the stream.
 - A dummy plug's resolutions, refresh rates and HDR support are shown, and **Act As** can make it a 4K HDR display at 60 Hz, or 1440p or 1080p HDR at 120 Hz. This installs display information (EDID) for it in `/usr/lib/firmware/edid/` and adds the `drm.edid_firmware` boot option, and asks for your password. It works with AMD, Intel and NVIDIA graphics.
-- **Resolution** matches each Moonlight client, or is fixed. **Sound** plays games straight into Sunshine's 5.1 or 7.1 output with EasyEffects quit, or through EasyEffects in stereo. The dock and notification banners are hidden during streams unless you turn this off.
+- **Resolution** matches each Moonlight client, or is fixed. **Sound** plays games in surround straight into Sunshine's 5.1 or 7.1 output with EasyEffects quit, or in stereo through EasyEffects. The dock and pop-up notifications are hidden during streams unless you turn this off.
 - Quitting from Moonlight closes the game and puts the displays, EasyEffects, the dock and notifications back. Turn on HDR and surround sound in Moonlight on each client.
 
 ## Installing
@@ -80,7 +81,7 @@ To build the RPM yourself, run `packaging/build-rpm.sh`; it is written to `dist/
 
 ## Setup and Preferences
 
-The first launch opens a setup wizard. It detects your Steam installation (native or Flatpak), the command used to start Steam, your account and your library folders, and every choice has an **Other…** option for entering a value by hand. It then offers two optional steps:
+The first launch opens a setup wizard. It finds your Steam installation and the kind of package it came from (such as RPM, Debian, Arch, Flatpak or Snap), your account and your library folders; **Change…** chooses Steam's data folder and command by hand. If nobody has signed in to Steam on this computer yet, setup can open Steam and carry on without an account. It then offers Moonlight streaming settings and two optional steps:
 
 - **Steam account**, using your own Steam Web API key.
 - **SteamGridDB**, using a free API key.
