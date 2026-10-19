@@ -17,9 +17,9 @@ HIDDEN_REFRESH = 30  # seconds otherwise, to keep the badge up to date
 def describe(item, rate):
     size = GLib.format_size
     parts = [item.detail]
-    if item.total and not item.downloaded:
+    if item.total and not item.downloaded and not item.staged:
         parts.append(f"{size(item.total)} to download")
-    elif item.total:
+    elif item.total and item.downloaded:
         parts.append(f"{size(item.downloaded)} of {size(item.total)}")
     elif item.stage_total:
         parts.append(f"{size(item.staged)} of {size(item.stage_total)}")
