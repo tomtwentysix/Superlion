@@ -25,7 +25,29 @@ GENRES = {
     "Indie": "superlion-genre-indie-symbolic",
     "VR": "superlion-vr-symbolic",
 }
-SECTION_TITLES = {"you": "You", "browse": "Browse"}
+# After Hours: a store of games with explicit sexual content, opened by clicking the
+# Browse heading five times quickly. Each view is store_api.after_hours()'s options.
+AFTER_HOURS_LISTS = [
+    ("after:top_sellers", "Top Sellers", "superlion-top-sellers-symbolic", {"sort": store_api.TOP_SELLERS}),
+    ("after:trending", "New and Trending", "superlion-trending-symbolic", {"sort": store_api.TRENDING}),
+    ("after:specials", "Specials", "superlion-sale-symbolic", {"discounted": True}),
+    ("after:coming_soon", "Coming Soon", "x-office-calendar-symbolic", {"coming_soon": True}),
+    ("after:free", "Free to Play", "superlion-free-symbolic", {"free": True}),
+]
+# (name, Steam tag ID, icon)
+AFTER_HOURS_GENRES = [
+    ("Visual Novel", 3799, "superlion-genre-visual-novel-symbolic"),
+    ("Dating Sim", 9551, "superlion-genre-dating-symbolic"),
+    ("RPG", 122, "superlion-genre-rpg-symbolic"),
+    ("Adventure", 21, "superlion-genre-adventure-symbolic"),
+    ("Action", 19, "superlion-genre-action-symbolic"),
+    ("Simulation", 599, "superlion-genre-simulation-symbolic"),
+    ("Puzzle", 1664, "superlion-genre-puzzle-symbolic"),
+    ("Strategy", 9, "superlion-genre-strategy-symbolic"),
+]
+SECRET_CLICKS = 5
+SECRET_WINDOW = 3_000_000  # microseconds
+SECTION_TITLES = {"after": "After Hours", "you": "You", "browse": "Browse"}
 WISHLIST_SORTS = [
     ("Your Order", None),
     ("Price", lambda item: item.get("final_cents", 0)),
@@ -64,7 +86,8 @@ def search_price(item):
 
 class Capsule(Gtk.Button):
     def __init__(self, item, on_open):
-        super().__init__()
+        # Centred, so a grid's wider cells do not stretch the picture.
+        super().__init__(halign=Gtk.Align.CENTER, valign=Gtk.Align.START)
         self.add_css_class("flat")
         self.add_css_class("store-capsule")
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
@@ -105,8 +128,11 @@ class StoreView(Gtk.Box):
         self.view = "featured"
         self.wishlist_ids = None  # The wishlist's app IDs in order, once loaded.
         self.wishlist_items = {}
+        self.cart = None  # How many items are in the cart, once known.
         self._serial = 0
         self.genres = list(GENRES)
+        self.after_hours = False
+        self._secret_clicks = []
         self.sidebar = self._build_sidebar()
 
         self.search_entry = Gtk.SearchEntry(placeholder_text="Search the store", hexpand=True)
@@ -161,18 +187,7 @@ class StoreView(Gtk.Box):
         self.sidebar_list = Gtk.ListBox(selection_mode=Gtk.SelectionMode.SINGLE)
         self.sidebar_list.add_css_class("navigation-sidebar")
         self.sidebar_list.set_header_func(self._sidebar_header)
-        self.rows = {}
-        entries = (
-            [("featured", "Featured", "superlion-featured-symbolic", "store")]
-            + [(key, title, icon, "store") for key, title, icon in CATEGORIES]
-            + [("genre:Free to Play", "Free to Play", "superlion-free-symbolic", "store"),
-               ("wishlist", "Wishlist", "starred-symbolic", "you"),
-               ("cart", "Cart", "superlion-cart-symbolic", "you")]
-        )
-        for key, title, icon, section in entries:
-            self.rows[key] = SidebarRow(key, title, icon, section)
-            self.sidebar_list.append(self.rows[key])
-        self._add_genres()
+        self._fill_sidebar()
         self.sidebar_list.connect("row-selected", self._on_row_selected)
         toolbar = Adw.ToolbarView(
             content=Gtk.ScrolledWindow(child=self.sidebar_list, hscrollbar_policy=Gtk.PolicyType.NEVER)
@@ -180,11 +195,34 @@ class StoreView(Gtk.Box):
         toolbar.add_top_bar(Adw.HeaderBar(show_title=False))
         return toolbar
 
-    def _add_genres(self):
-        for genre in self.genres:
-            key = f"genre:{genre}"
-            self.rows[key] = SidebarRow(key, genre, GENRES[genre], "browse")
+    def _fill_sidebar(self):
+        self.sidebar_list.remove_all()
+        self.rows = {}
+        if self.after_hours:
+            entries = (
+                [("after:featured", "Featured", "superlion-featured-symbolic", "after")]
+                + [(key, title, icon, "after") for key, title, icon, _options in AFTER_HOURS_LISTS]
+                + [(f"after:genre:{tag}", name, icon, "browse") for name, tag, icon in AFTER_HOURS_GENRES]
+                + [("leave", "Back to the Store", "go-previous-symbolic", "leave")]
+            )
+        else:
+            entries = (
+                [("featured", "Featured", "superlion-featured-symbolic", "store")]
+                + [(key, title, icon, "store") for key, title, icon in CATEGORIES]
+                + [("genre:Free to Play", "Free to Play", "superlion-free-symbolic", "store"),
+                   ("wishlist", "Wishlist", "starred-symbolic", "you"),
+                   ("cart", "Cart", "superlion-cart-symbolic", "you")]
+                + [(f"genre:{genre}", genre, GENRES[genre], "browse") for genre in self.genres]
+            )
+        for key, title, icon, section in entries:
+            self.rows[key] = SidebarRow(key, title, icon, section)
             self.sidebar_list.append(self.rows[key])
+        self._show_counts()
+
+    def _show_counts(self):
+        if "wishlist" in self.rows:
+            self.rows["wishlist"].count.set_label(str(len(self.wishlist_ids)) if self.wishlist_ids else "")
+            self.rows["cart"].count.set_label(str(self.cart) if self.cart else "")
 
     def sort_genres(self, games):
         """Put the genres most common among the user's games first."""
@@ -195,24 +233,50 @@ class StoreView(Gtk.Box):
                     counts[genre] += 1
             if game.props.vr:
                 counts["VR"] += 1
-        selected = self.sidebar_list.get_selected_row()
-        for genre in self.genres:
-            self.sidebar_list.remove(self.rows.pop(f"genre:{genre}"))
         self.genres.sort(key=lambda g: -counts[g])
-        self._add_genres()
-        if selected is not None and selected.key in self.rows:
-            self.sidebar_list.select_row(self.rows[selected.key])
+        if not self.after_hours:
+            selected = self.sidebar_list.get_selected_row()
+            self._fill_sidebar()
+            if selected is not None and selected.key in self.rows:
+                self.sidebar_list.select_row(self.rows[selected.key])
 
-    @staticmethod
-    def _sidebar_header(row, before):
+    def _sidebar_header(self, row, before):
         if row.section in SECTION_TITLES and (before is None or before.section != row.section):
             label = Gtk.Label(label=SECTION_TITLES[row.section], xalign=0, margin_start=12, margin_top=12,
                               margin_bottom=6)
             label.add_css_class("heading")
             label.add_css_class("dim-label")
+            if row.section == "browse" and not self.after_hours:
+                click = Gtk.GestureClick()
+                click.connect("pressed", lambda *_: self._on_secret_click())
+                label.add_controller(click)
             row.set_header(label)
         else:
             row.set_header(None)
+
+    def _on_secret_click(self):
+        now = GLib.get_monotonic_time()
+        self._secret_clicks = [t for t in self._secret_clicks if now - t < SECRET_WINDOW] + [now]
+        if len(self._secret_clicks) < SECRET_CLICKS:
+            return
+        self._secret_clicks = []
+        alert = Adw.AlertDialog(
+            heading="Are You 18 or Older?",
+            body="After Hours lists games with explicit sexual content. It is only for people aged 18 or older.",
+        )
+        alert.add_response("cancel", "Cancel")
+        alert.add_response("enter", "I Am 18 or Older")
+        alert.set_close_response("cancel")
+        alert.connect("response", lambda _a, response: response == "enter" and self.set_after_hours(True))
+        alert.present(self.window)
+
+    def set_after_hours(self, on):
+        """Switch the sidebar and views between the store and After Hours."""
+        self.after_hours = on
+        self.view = "after:featured" if on else "featured"
+        self.search_entry.set_placeholder_text("Search After Hours" if on else "Search the store")
+        self._fill_sidebar()
+        self.sidebar_list.select_row(self.rows[self.view])
 
     def load(self, force=False):
         config = self.window.config
@@ -249,9 +313,8 @@ class StoreView(Gtk.Box):
                 if self.view == "wishlist":
                     self.stack.set_visible_child_name("error")
                 return
-            self.wishlist_ids, cart = result
-            self.rows["wishlist"].count.set_label(str(len(self.wishlist_ids)) if self.wishlist_ids else "")
-            self.rows["cart"].count.set_label(str(cart) if cart else "")
+            self.wishlist_ids, self.cart = result
+            self._show_counts()
             if self.view == "wishlist":
                 self._show_wishlist()
 
@@ -259,6 +322,9 @@ class StoreView(Gtk.Box):
 
     def _on_row_selected(self, _list, row):
         if row is None:
+            return
+        if row.key == "leave":
+            GLib.idle_add(lambda: (self.set_after_hours(False), GLib.SOURCE_REMOVE)[-1])
             return
         if row.key == "cart":
             self.window.open_web(f"{store_api.STORE}/cart", "Cart")
@@ -276,7 +342,9 @@ class StoreView(Gtk.Box):
         self._serial += 1
         if not self.loaded_region:
             return
-        if self.view == "featured":
+        if self.view.startswith("after:"):
+            self._show_after_hours()
+        elif self.view == "featured":
             self._show_sections([(title, self.featured.get(key, [])) for key, title, _icon in CATEGORIES])
         elif self.view == "wishlist":
             self._show_wishlist()
@@ -337,6 +405,39 @@ class StoreView(Gtk.Box):
                 self.stack.set_visible_child_name("error")
                 return
             self._show_sections(sections)
+
+        auth.run_async(work, done)
+
+    def _show_after_hours(self):
+        """An After Hours view: its home and genres in sections like the store's, its lists as a grid."""
+        serial, region, view = self._serial, self.window.store_region, self.view
+        lists = {key: (title, options) for key, title, _icon, options in AFTER_HOURS_LISTS}
+        self.stack.set_visible_child_name("loading")
+
+        def sections(tagid=None):
+            return [
+                (title, store_api.after_hours(region, tagid=tagid, **options))
+                for key, (title, options) in lists.items() if key != "after:free"
+            ]
+
+        def work():
+            if view == "after:featured":
+                return sections()
+            if view.startswith("after:genre:"):
+                return sections(int(view.rpartition(":")[2]))
+            title, options = lists[view]
+            return title, store_api.after_hours(region, **options)
+
+        def done(result, error):
+            if serial != self._serial:
+                return  # Another view was chosen meanwhile.
+            if error:
+                self.error_page.set_description("Check your internet connection and try again.")
+                self.stack.set_visible_child_name("error")
+            elif view in lists:
+                self._show_grid(*result)
+            else:
+                self._show_sections(result)
 
         auth.run_async(work, done)
 
@@ -456,7 +557,7 @@ class StoreView(Gtk.Box):
                 return
             ids = self.wishlist_ids if self.wishlist_ids is not None else []
             self.wishlist_ids = [a for a in ids if a != appid] + ([appid] if add else [])
-            self.rows["wishlist"].count.set_label(str(len(self.wishlist_ids)) if self.wishlist_ids else "")
+            self._show_counts()
             self.window.toast(f"{name} {'added to' if add else 'removed from'} your wishlist")
             if self.view == "wishlist" and self.stack.get_visible_child_name() == "wishlist":
                 self._show_wishlist()
@@ -485,14 +586,15 @@ class StoreView(Gtk.Box):
                 return
             self._show_results(items)
 
-        auth.run_async(lambda: store_api.search(term, region), done)
+        search = store_api.after_hours_search if self.after_hours else store_api.search
+        auth.run_async(lambda: search(term, region), done)
 
     def _show_results(self, items):
         self.results.remove_all()
         for item in items:
             row = Adw.ActionRow(
                 title=GLib.markup_escape_text(item.get("name", "")),
-                subtitle=search_price(item),
+                subtitle=item_price(item) if "price_text" in item else search_price(item),
                 activatable=True,
             )
             thumb = Gtk.Picture(content_fit=Gtk.ContentFit.COVER, can_shrink=True,

@@ -77,7 +77,44 @@ def genre(name, region):
 
 
 ITEMS_URL = "https://api.steampowered.com/IStoreBrowseService/GetItems/v1"
+QUERY_URL = "https://api.steampowered.com/IStoreQueryService/Query/v1"
 ASSETS = "https://shared.akamai.steamstatic.com/store_item_assets/"
+# The After Hours section lists games with Steam's content descriptor 3, as Steam's
+# own section for them does. Store queries cannot filter on descriptors, so these
+# games are found by tags (Sexual Content, Hentai, Nudity) and then checked.
+AFTER_HOURS_DESCRIPTOR = 3
+AFTER_HOURS_TAGS = [12095, 9130, 6650]
+# Store query sort orders.
+TOP_SELLERS = 10
+TRENDING = 11
+
+
+def _item(item):
+    """A store item in the shape items() returns."""
+    option = item.get("best_purchase_option") or {}
+    assets = item.get("assets") or {}
+
+    def art(name):
+        return ASSETS + assets["asset_url_format"].replace("${FILENAME}", assets[name]) if name in assets else ""
+
+    discount = int(option.get("discount_pct", 0) or 0)
+    return {
+        "id": item["appid"],
+        "name": item.get("name", ""),
+        # The header image is the shape of the store's capsules, unlike main_capsule.
+        "large_capsule_image": art("header"),
+        "tiny_image": art("small_capsule"),
+        "price_text": "Free" if item.get("is_free") else option.get("formatted_final_price", ""),
+        "original_text": option.get("formatted_original_price", ""),
+        "final_cents": int(option.get("final_price_in_cents", 0) or 0),
+        "discount_percent": discount,
+        "discounted": bool(discount),
+        "release": int((item.get("release") or {}).get("steam_release_date", 0) or 0),
+        "after_hours": AFTER_HOURS_DESCRIPTOR in (item.get("content_descriptorids") or []),
+    }
+
+
+DATA_REQUEST = {"include_assets": True, "include_release": True, "include_ratings": True}
 
 
 def items(appids, region):
@@ -85,7 +122,8 @@ def items(appids, region):
 
     Items have featured()'s "id", "name", "large_capsule_image", "tiny_image",
     "discounted" and "discount_percent", plus "price_text" and "original_text"
-    formatted by the store, "final_cents" and "release" (Unix time, or 0).
+    formatted by the store, "final_cents", "release" (Unix time, or 0) and
+    "after_hours" (whether the game belongs in After Hours).
     """
     found = {}
     appids = list(appids)
@@ -93,32 +131,41 @@ def items(appids, region):
         request = {
             "ids": [{"appid": a} for a in appids[start:start + 50]],
             "context": {"language": "english", "country_code": region},
-            "data_request": {"include_assets": True, "include_release": True},
+            "data_request": DATA_REQUEST,
         }
         data = _get_json(ITEMS_URL, {"input_json": json.dumps(request)}, LIST_TTL)
         for item in (data.get("response") or {}).get("store_items", []):
-            if item.get("success") != 1:
-                continue
-            option = item.get("best_purchase_option") or {}
-            assets = item.get("assets") or {}
-
-            def art(name, assets=assets):
-                return ASSETS + assets["asset_url_format"].replace("${FILENAME}", assets[name]) if name in assets else ""
-
-            discount = int(option.get("discount_pct", 0) or 0)
-            found[item["appid"]] = {
-                "id": item["appid"],
-                "name": item.get("name", ""),
-                "large_capsule_image": art("main_capsule"),
-                "tiny_image": art("small_capsule"),
-                "price_text": "Free" if item.get("is_free") else option.get("formatted_final_price", ""),
-                "original_text": option.get("formatted_original_price", ""),
-                "final_cents": int(option.get("final_price_in_cents", 0) or 0),
-                "discount_percent": discount,
-                "discounted": bool(discount),
-                "release": int((item.get("release") or {}).get("steam_release_date", 0) or 0),
-            }
+            if item.get("success") == 1:
+                found[item["appid"]] = _item(item)
     return found
+
+
+def after_hours(region, sort=TOP_SELLERS, tagid=None, coming_soon=False, discounted=False, free=False):
+    """After Hours games as a list of items(), optionally of one tag, such as Visual Novel."""
+    filters = {
+        "type_filters": {"include_games": True},
+        "tagids_must_match": [{"tagids": AFTER_HOURS_TAGS}] + ([{"tagids": [tagid]}] if tagid else []),
+        "coming_soon_only" if coming_soon else "released_only": True,
+    }
+    if discounted:
+        filters["price_filters"] = {"min_discount_percent": 1}
+    elif free:
+        filters["price_filters"] = {"only_free_items": True}
+    request = {
+        "query": {"count": 200, "sort": sort, "filters": filters},
+        "context": {"language": "english", "country_code": region},
+        "data_request": {"include_basic_info": True, **DATA_REQUEST},
+    }
+    data = _get_json(QUERY_URL, {"input_json": json.dumps(request)}, LIST_TTL)
+    found = [_item(i) for i in (data.get("response") or {}).get("store_items", []) if i.get("success") == 1]
+    return [item for item in found if item["after_hours"]]
+
+
+def after_hours_search(term, region):
+    """After Hours games matching a search, as items()."""
+    ids = [item["id"] for item in search(term, region)]
+    found = items(ids, region)
+    return [found[a] for a in ids if a in found and found[a]["after_hours"]]
 
 
 def search(term, region):
