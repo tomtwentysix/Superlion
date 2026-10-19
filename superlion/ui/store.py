@@ -1,4 +1,6 @@
-"""Native store: its sidebar, home, lists, genres, wishlist and search, and store game pages."""
+"""Native store: its sidebar, home, lists, genres, wishlist, cart and search, and store game pages."""
+
+import json
 
 from gi.repository import Adw, GLib, Gtk, Pango
 
@@ -6,7 +8,7 @@ from .. import auth, steam_control, store_account, store_api
 from . import images
 from .library_view import SidebarRow
 from .media import MediaCarousel, description_widgets
-from .webview import STATE_SCRIPT, WISHLIST_SCRIPT, SteamWebPage, run_in_store
+from .webview import CART_SCRIPT, STATE_SCRIPT, WISHLIST_SCRIPT, SteamWebPage, run_in_store
 
 CATEGORIES = [
     ("specials", "Specials", "superlion-sale-symbolic"),
@@ -56,6 +58,8 @@ WISHLIST_SORTS = [
 ]
 CAPSULE_W, CAPSULE_H = 292, 136
 LOGIN_URL = f"{store_api.STORE}/login/"
+# Payment happens only on Steam's own checkout page.
+CHECKOUT_URL = "https://checkout.steampowered.com/checkout/?accountcart=1"
 
 
 def price_text(final, original, currency, discount):
@@ -129,7 +133,7 @@ class StoreView(Gtk.Box):
         self.view = "featured"
         self.wishlist_ids = None  # The wishlist's app IDs in order, once loaded.
         self.wishlist_items = {}
-        self.cart = None  # How many items are in the cart, once known.
+        self.cart = None  # The cart API's cart, {"line_items", "subtotal"}, once loaded.
         self.signed_in = False
         self._serial = 0
         self.genres = list(GENRES)
@@ -163,6 +167,7 @@ class StoreView(Gtk.Box):
         self.stack.add_named(_scroller(grid_box), "grid")
 
         self.stack.add_named(self._build_wishlist_page(), "wishlist")
+        self.stack.add_named(self._build_cart_page(), "cart")
 
         self.results = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
         self.results.add_css_class("boxed-list")
@@ -224,7 +229,8 @@ class StoreView(Gtk.Box):
     def _show_counts(self):
         if "wishlist" in self.rows:
             self.rows["wishlist"].count.set_label(str(len(self.wishlist_ids)) if self.wishlist_ids else "")
-            self.rows["cart"].count.set_label(str(self.cart) if self.cart else "")
+            count = len((self.cart or {}).get("line_items", []))
+            self.rows["cart"].count.set_label(str(count) if count else "")
 
     def sort_genres(self, games):
         """Put the genres most common among the user's games first."""
@@ -319,21 +325,19 @@ class StoreView(Gtk.Box):
 
         def with_state(state):
             state = state or {}
-            self.signed_in, self.cart = state.get("signed_in", False), state.get("cart")
+            self.signed_in, self.cart = state.get("signed_in", False), state.get("cart") or {}
+            if self.view == "cart":
+                self._show_cart()
             token = state.get("token", "")
             auth.run_async(lambda: store_account.wishlist(auth.steamid64(config), token), done)
 
-        run_in_store(STATE_SCRIPT, {}, with_state)
+        run_in_store(STATE_SCRIPT, {"country": self.window.store_region}, with_state)
 
     def _on_row_selected(self, _list, row):
         if row is None:
             return
         if row.key == "leave":
             GLib.idle_add(lambda: (self.set_after_hours(False), GLib.SOURCE_REMOVE)[-1])
-            return
-        if row.key == "cart":
-            self.window.open_web(f"{store_api.STORE}/cart", "Cart")
-            GLib.idle_add(lambda: (self.sidebar_list.select_row(self.rows[self.view]), GLib.SOURCE_REMOVE)[-1])
             return
         self.view = row.key
         if self.search_entry.get_text():
@@ -353,6 +357,8 @@ class StoreView(Gtk.Box):
             self._show_sections([(title, self.featured.get(key, [])) for key, title, _icon in CATEGORIES])
         elif self.view == "wishlist":
             self._show_wishlist()
+        elif self.view == "cart":
+            self._show_cart()
         elif self.view.startswith("genre:"):
             self._show_genre(self.view.partition(":")[2])
         else:
@@ -549,6 +555,145 @@ class StoreView(Gtk.Box):
         self.wishlist_status.set_visible(False)
         self.stack.set_visible_child_name("wishlist")
 
+    def show_cart(self):
+        """Open the Store at the cart."""
+        if self.after_hours:
+            self.set_after_hours(False)
+        self.window.view_stack.set_visible_child_name("store")
+        self.sidebar_list.select_row(self.rows["cart"])
+
+    def _build_cart_page(self):
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, margin_top=12, margin_bottom=24,
+                      margin_start=12, margin_end=12)
+        title = Gtk.Label(label="Cart", xalign=0)
+        title.add_css_class("title-2")
+        box.append(title)
+        self.cart_list = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
+        self.cart_list.add_css_class("boxed-list")
+        box.append(self.cart_list)
+        self.cart_footer = Gtk.Box(spacing=12)
+        self.cart_total = Gtk.Label(xalign=0, hexpand=True)
+        self.cart_total.add_css_class("title-3")
+        self.cart_footer.append(self.cart_total)
+        checkout = Gtk.Button(label="Check Out")
+        checkout.add_css_class("pill")
+        checkout.add_css_class("suggested-action")
+        checkout.connect("clicked", lambda *_: self.window.open_web(CHECKOUT_URL, "Checkout"))
+        self.cart_footer.append(checkout)
+        box.append(self.cart_footer)
+        self.cart_status = Adw.StatusPage(icon_name="superlion-cart-symbolic", vexpand=True)
+        self.cart_button = Gtk.Button(label="Sign In to the Store", halign=Gtk.Align.CENTER)
+        self.cart_button.add_css_class("pill")
+        self.cart_button.connect("clicked", lambda *_: self.window.open_web(LOGIN_URL, "Sign In"))
+        self.cart_status.set_child(self.cart_button)
+        box.append(self.cart_status)
+        return _scroller(Adw.Clamp(child=box, maximum_size=860))
+
+    def _show_cart(self):
+        if self.cart is None:
+            self.stack.set_visible_child_name("loading")
+            return  # refresh_counts() shows it once loaded.
+        lines = self.cart.get("line_items", [])
+        if not lines:
+            if self.signed_in:
+                self._cart_message("Your Cart Is Empty", "Games you add to your cart appear here.")
+            else:
+                self._cart_message("Not Signed In", "Sign in to the store to use your cart.", sign_in=True)
+            return
+        serial, region = self._serial, self.window.store_region
+        self.stack.set_visible_child_name("loading")
+
+        def done(found, error):
+            if serial != self._serial:
+                return
+            if error:
+                self.stack.set_visible_child_name("error")
+                return
+            self._fill_cart(found)
+
+        auth.run_async(lambda: store_api.cart_items(lines, region), done)
+
+    def _cart_message(self, title, description, sign_in=False):
+        self.cart_list.set_visible(False)
+        self.cart_footer.set_visible(False)
+        self.cart_status.set_visible(True)
+        self.cart_status.set_title(title)
+        self.cart_status.set_description(description)
+        self.cart_button.set_visible(sign_in)
+        self.stack.set_visible_child_name("cart")
+
+    def _fill_cart(self, found):
+        self.cart_list.remove_all()
+        for item in found:
+            row = Adw.ActionRow(title=GLib.markup_escape_text(item["name"]))
+            if item["gift"]:
+                row.set_subtitle("Gift")
+            thumb = Gtk.Picture(content_fit=Gtk.ContentFit.COVER, can_shrink=True,
+                                width_request=120, height_request=45, valign=Gtk.Align.CENTER)
+            thumb.add_css_class("card")
+            images.load(item["image"], 240, 90, thumb.set_paintable)
+            row.add_prefix(thumb)
+            price = Gtk.Label(label=item_price({**item, "discounted": bool(item["discount_percent"])}),
+                              valign=Gtk.Align.CENTER)
+            if item["discount_percent"]:
+                price.add_css_class("success")
+                price.set_tooltip_text(f"On sale, was {item['original_text']}")
+            row.add_suffix(price)
+            remove = Gtk.Button(icon_name="user-trash-symbolic", tooltip_text="Remove From Cart",
+                                valign=Gtk.Align.CENTER)
+            remove.add_css_class("flat")
+            remove.connect("clicked", lambda button, i=item: self._remove_from_cart(button, i))
+            row.add_suffix(remove)
+            self.cart_list.append(row)
+        subtotal = (self.cart.get("subtotal") or {}).get("formatted_amount", "")
+        self.cart_total.set_label(f"Total: {subtotal}" if subtotal else "")
+        self.cart_list.set_visible(True)
+        self.cart_footer.set_visible(True)
+        self.cart_status.set_visible(False)
+        self.stack.set_visible_child_name("cart")
+
+    def _cart_call(self, method, request, done):
+        """Call a cart API method; done(cart) gets the updated cart, or None if it failed or needs a sign-in."""
+        def finished(result):
+            if result is not None and not result.get("signed_in"):
+                self.window.open_web(LOGIN_URL, "Sign In")
+                self.window.toast("Sign in to the store to use your cart")
+                done(None)
+                return
+            cart = ((result or {}).get("response") or {}).get("cart") if (result or {}).get("ok") else None
+            if cart is not None:
+                self.signed_in, self.cart = True, cart
+                self._show_counts()
+                if self.view == "cart" and self.stack.get_visible_child_name() == "cart":
+                    self._show_cart()
+            done(cart)
+
+        run_in_store(CART_SCRIPT, {"method": method, "request": json.dumps(request)}, finished)
+
+    def add_to_cart(self, option, done):
+        """Add a purchase option from store_api.purchase_options() to the cart; done() afterwards."""
+        item = {key: option[key] for key in ("packageid", "bundleid") if key in option}
+
+        def added(cart):
+            done()
+            if cart is None:
+                self.window.toast(f"{option['name']} could not be added to your cart")
+            else:
+                self.window.toast(f"{option['name']} added to your cart")
+
+        self._cart_call("AddItemsToCart", {"user_country": self.window.store_region, "items": [item]}, added)
+
+    def _remove_from_cart(self, button, item):
+        button.set_sensitive(False)
+
+        def removed(cart):
+            if cart is None:
+                button.set_sensitive(True)
+                self.window.toast(f"{item['name']} could not be removed from your cart")
+
+        request = {"line_item_id": item["line_item_id"], "user_country": self.window.store_region}
+        self._cart_call("RemoveItemFromCart", request, removed)
+
     def set_wishlisted(self, appid, name, add, done=None):
         """Add a game to the wishlist or remove it, signing in first if needed; done() after a change."""
 
@@ -647,7 +792,7 @@ class StoreAppPage(Adw.NavigationPage):
         toolbar = Adw.ToolbarView(content=self.stack)
         header = Adw.HeaderBar()
         cart = Gtk.Button(icon_name="superlion-cart-symbolic", tooltip_text="Cart")
-        cart.connect("clicked", lambda *_: window.open_web(f"{store_api.STORE}/cart", "Cart"))
+        cart.connect("clicked", lambda *_: (window.nav.pop_to_tag("main"), window.store_view.show_cart()))
         header.pack_end(cart)
         toolbar.add_top_bar(header)
         self.set_child(toolbar)
@@ -656,13 +801,17 @@ class StoreAppPage(Adw.NavigationPage):
 
         def load():
             data = store_api.details(appid, region)
-            summary = None
+            summary, options = None, []
             if data:
                 try:
                     summary = store_api.reviews(appid)
                 except Exception:  # The review summary is optional.
                     summary = None
-            return data, summary
+                try:
+                    options = store_api.purchase_options(appid, region)
+                except Exception:  # Buying falls back to Steam's page.
+                    options = []
+            return data, summary, options
 
         def done(result, error):
             if error or not result or not result[0]:
@@ -679,7 +828,7 @@ class StoreAppPage(Adw.NavigationPage):
         if self.media:
             self.media.stop()
 
-    def _build(self, data, summary):
+    def _build(self, data, summary, options):
         self.set_title(data.get("name", self.get_title()))
         self.media = MediaCarousel(data)
         if not self.media.is_empty:
@@ -712,7 +861,7 @@ class StoreAppPage(Adw.NavigationPage):
             meta.append(reviews)
         self.content.append(meta)
 
-        self.content.append(self._build_buttons(data))
+        self.content.append(self._build_buttons(data, options))
 
         for widget in description_widgets(data):
             self.content.append(widget)
@@ -734,7 +883,7 @@ class StoreAppPage(Adw.NavigationPage):
                 group.add(row)
         self.content.append(group)
 
-    def _build_buttons(self, data):
+    def _build_buttons(self, data, options):
         box = Gtk.Box(spacing=12)
         game = self.window.find_game(self.appid)
         page_url = f"{store_api.STORE}/app/{self.appid}/"
@@ -744,12 +893,19 @@ class StoreAppPage(Adw.NavigationPage):
         elif game is not None:
             primary = Gtk.Button(label="Install")
             primary.connect("clicked", lambda *_: self.window.install_game(self.appid, game.props.name))
+        elif len(options) == 1:
+            primary = Gtk.Button(label="Add to Cart")
+            primary.connect("clicked", lambda *_: self._add_to_cart(options[0]))
+        elif options:
+            primary = Gtk.MenuButton(label="Add to Cart", popover=self._options_popover(options),
+                                     always_show_arrow=True)
         else:
             primary = Gtk.Button(label="Buy")
             primary.connect("clicked", lambda *_: self.window.open_web(page_url, data.get("name", "Store")))
         primary.add_css_class("suggested-action")
         primary.add_css_class("pill")
         box.append(primary)
+        self.add_button = primary
 
         if game is None:
             self.wishlist_button = Gtk.Button()
@@ -764,6 +920,27 @@ class StoreAppPage(Adw.NavigationPage):
         client.connect("clicked", lambda *_: self._open_uri(f"steam://store/{self.appid}"))
         box.append(client)
         return box
+
+    def _options_popover(self, options):
+        """A menu of a game's editions and bundles, each with its price."""
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        popover = Gtk.Popover(child=box)
+        popover.add_css_class("menu")
+        for option in options:
+            content = Gtk.Box(spacing=24)
+            content.append(Gtk.Label(label=option["name"], xalign=0, hexpand=True))
+            price = Gtk.Label(label=item_price({**option, "discounted": bool(option["discount_percent"])}))
+            price.add_css_class("success" if option["discount_percent"] else "dim-label")
+            content.append(price)
+            button = Gtk.Button(child=content)
+            button.add_css_class("flat")
+            button.connect("clicked", lambda _b, o=option: (popover.popdown(), self._add_to_cart(o)))
+            box.append(button)
+        return popover
+
+    def _add_to_cart(self, option):
+        self.add_button.set_sensitive(False)
+        self.window.store_view.add_to_cart(option, lambda: self.add_button.set_sensitive(True))
 
     def _on_wishlist(self):
         ids = self.window.store_view.wishlist_ids

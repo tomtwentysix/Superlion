@@ -45,17 +45,29 @@ def clear_sign_in(callback=None):
     )
 
 
-# The store's sign-in and data for Superlion: whether the user is signed in, the
-# Web API token Steam's own pages use, and the wishlist and cart counts.
+# Calls an IAccountCartService method (method, a JSON request) with the token
+# Steam's own pages use. Returns the response, or {signed_in: false}.
+CART_SCRIPT = """
+if (!window.g_AccountID) return JSON.stringify({signed_in: false});
+const user = JSON.parse(document.getElementById("application_config").dataset.store_user_config || "{}");
+const url = `https://api.steampowered.com/IAccountCartService/${method}/v1/?access_token=${user.webapi_token}`;
+const response = method === "GetCart"
+    ? await fetch(`${url}&input_json=${encodeURIComponent(request)}`)
+    : await fetch(url, {method: "POST", body: new URLSearchParams({input_json: request})});
+return JSON.stringify({signed_in: true, ok: response.ok, response: response.ok ? (await response.json()).response : null});
+"""
+# The store's sign-in for Superlion: whether the user is signed in, the Web API
+# token Steam's own pages use, and the cart's line items.
 STATE_SCRIPT = """
 const config = document.getElementById("application_config");
 const user = config ? JSON.parse(config.dataset.store_user_config || "{}") : {};
-const cart = user.shoppingcart || {};
-return JSON.stringify({
-    signed_in: Boolean(window.g_AccountID),
-    token: user.webapi_token || "",
-    cart: cart.line_items ? cart.line_items.length : cart.line_item_count || 0,
-});
+let cart = [];
+if (window.g_AccountID) {
+    const url = "https://api.steampowered.com/IAccountCartService/GetCart/v1/";
+    const response = await fetch(`${url}?access_token=${user.webapi_token}&user_country=${country}`);
+    cart = response.ok ? ((await response.json()).response.cart || {}).line_items || [] : [];
+}
+return JSON.stringify({signed_in: Boolean(window.g_AccountID), token: user.webapi_token || "", cart});
 """
 WISHLIST_SCRIPT = """
 if (!window.g_AccountID) return JSON.stringify({signed_in: false});

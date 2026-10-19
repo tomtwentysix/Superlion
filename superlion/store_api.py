@@ -140,6 +140,71 @@ def items(appids, region):
     return found
 
 
+def purchase_options(appid, region):
+    """Every way to buy an app, editions and bundles included.
+
+    Each is {"packageid" or "bundleid": ID, "name", "price_text", "original_text",
+    "discount_percent"}, the form the cart API takes items in.
+    """
+    request = {
+        "ids": [{"appid": appid}],
+        "context": {"language": "english", "country_code": region},
+        "data_request": {"include_all_purchase_options": True},
+    }
+    data = _get_json(ITEMS_URL, {"input_json": json.dumps(request)}, LIST_TTL)
+    found = []
+    for item in (data.get("response") or {}).get("store_items", []):
+        for option in item.get("purchase_options", []):
+            kind = "packageid" if option.get("packageid") else "bundleid"
+            found.append({
+                kind: option[kind],
+                "name": option.get("purchase_option_name", ""),
+                "price_text": option.get("formatted_final_price", ""),
+                "original_text": option.get("formatted_original_price", ""),
+                "discount_percent": int(option.get("discount_pct", 0) or 0),
+            })
+    return found
+
+
+def cart_items(line_items, region):
+    """The cart API's line items described for display, in order.
+
+    Each is {"line_item_id", "name", "image", "price_text", "original_text",
+    "discount_percent", "gift"}. Packages have no art of their own, so they
+    use their first game's.
+    """
+    ids = [{"packageid": i["packageid"]} if i.get("packageid") else {"bundleid": i["bundleid"]} for i in line_items]
+    request = {
+        "ids": ids,
+        "context": {"language": "english", "country_code": region},
+        "data_request": {"include_assets": True, "include_basic_info": True},
+    }
+    data = _get_json(ITEMS_URL, {"input_json": json.dumps(request)}, LIST_TTL)
+    described = {(i.get("item_type"), i.get("id")): i for i in (data.get("response") or {}).get("store_items", [])}
+    games = items({a for i in described.values() for a in (i.get("included_appids") or [])[:1]}, region)
+    found = []
+    for line in line_items:
+        key = (1, line["packageid"]) if line.get("packageid") else (2, line["bundleid"])
+        item = described.get(key, {})
+        option = item.get("best_purchase_option") or {}
+        assets = item.get("assets") or {}
+        if "header" in assets:
+            image = ASSETS + assets["asset_url_format"].replace("${FILENAME}", assets["header"])
+        else:
+            image = games.get(next(iter(item.get("included_appids") or []), 0), {}).get("tiny_image", "")
+        found.append({
+            "line_item_id": line["line_item_id"],
+            "name": item.get("name", ""),
+            "image": image,
+            "price_text": option.get("formatted_final_price")
+            or (line.get("price_when_added") or {}).get("formatted_amount", ""),
+            "original_text": option.get("formatted_original_price", ""),
+            "discount_percent": int(option.get("discount_pct", 0) or 0),
+            "gift": bool((line.get("flags") or {}).get("is_gift")),
+        })
+    return found
+
+
 def after_hours(region, sort=TOP_SELLERS, tagid=None, coming_soon=False, discounted=False, free=False):
     """After Hours games as a list of items(), optionally of one tag, such as Visual Novel."""
     filters = {

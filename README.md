@@ -54,7 +54,7 @@ Superlion is dedicated to the memory of John Wharton of S J Wharton Ltd (1953–
 - Native store browsing, search and game pages, with prices in your Steam profile's country (or the United Kingdom's when it shows none).
 - A sidebar with Featured, Specials, New and Trending, Top Sellers, Coming Soon and Free to Play, your wishlist and cart with their counts, and genres, those most common in your library first.
 - **Wishlist** lists your wishlist with prices, sales marked, sorted by your order, price, discount or release date. A private wishlist needs the store sign-in.
-- **Add to Wishlist** and removing from the wishlist use the store sign-in kept inside Superlion, without opening the store's web page. Buying and the cart open Steam's web pages inside the app.
+- **Add to Wishlist** and removing from the wishlist use the store sign-in kept inside Superlion, without opening the store's web page. **Add to Cart** offers each edition and bundle with its price, and the **Cart** in the sidebar lists what is in it, with discounts, gifts and the total, and removes items. **Check Out** opens Steam's own checkout inside the app for payment.
 
 ### Steam in the background
 - Playing, installing and streaming a game start Steam hidden, so they work without Steam's window appearing. Steam's window only opens for its own pages, such as **Open Downloads in Steam**.
