@@ -1,5 +1,5 @@
 Name:           superlion
-Version:        0.9.4
+Version:        0.9.5
 Release:        1%{?dist}
 Summary:        Native GNOME front end for your Steam library
 License:        GPL-3.0-or-later
@@ -43,6 +43,7 @@ install -Dm644 data/dedication/john-wharton.png %{buildroot}%{_datadir}/%{name}/
 install -Dm755 packaging/superlion %{buildroot}%{_bindir}/superlion
 desktop-file-install --dir=%{buildroot}%{_datadir}/applications packaging/uk.co.solarflareit.Superlion.desktop
 install -Dm644 packaging/uk.co.solarflareit.Superlion.metainfo.xml %{buildroot}%{_metainfodir}/uk.co.solarflareit.Superlion.metainfo.xml
+install -Dm644 packaging/superlion-copr.repo %{buildroot}%{_datadir}/dnf5/repos.override.d/50-superlion.repo
 install -Dm644 data/icons/hicolor/symbolic/apps/uk.co.solarflareit.Superlion-symbolic.svg %{buildroot}%{_datadir}/icons/hicolor/symbolic/apps/uk.co.solarflareit.Superlion-symbolic.svg
 # PNG only: some systems cannot draw SVG application icons, and a scalable SVG
 # would be chosen for any size without a PNG, leaving the icon blank there.
@@ -61,8 +62,12 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/uk.co.solarflareit.Su
 %{_datadir}/applications/uk.co.solarflareit.Superlion.desktop
 %{_metainfodir}/uk.co.solarflareit.Superlion.metainfo.xml
 %{_datadir}/icons/hicolor/*/apps/uk.co.solarflareit.Superlion*
+%{_datadir}/dnf5/repos.override.d/50-superlion.repo
 
 %changelog
+* Mon Oct 19 2026 Tom <tom@solarflareit.co.uk> - 0.9.5-1
+- Check the Superlion repository for updates every 4 hours instead of every 2 days.
+
 * Mon Oct 19 2026 Tom <tom@solarflareit.co.uk> - 0.9.4-1
 - Give the store sidebar and each genre their own icons. Keep store capsules in shape in grids. Fix adding to and removing from the wishlist once the store sign-in is more than a day old.
 
