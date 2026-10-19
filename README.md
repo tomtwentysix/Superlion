@@ -57,9 +57,10 @@ Superlion is dedicated to the memory of John Wharton of S J Wharton Ltd (1953–
 
 ### Streaming with Sunshine
 - **Add to Sunshine** in a game's **⋮** menu lists it in [Sunshine](https://github.com/LizardByte/Sunshine), so Moonlight can start it. Setup and **Preferences → Steam** show whether Sunshine is installed, running and able to stream HDR, which needs Sunshine from [LizardByte's COPR](https://copr.fedorainfracloud.org/coprs/lizardbyte/stable/) rather than the Flatpak or AppImage.
-- When a stream starts, the main monitor switches to the resolution, refresh rate and HDR or SDR that the Moonlight client asked for, and other monitors are turned off. Turn on HDR and surround sound in Moonlight on each client.
-- EasyEffects is quit for the stream, so games play straight into Sunshine's 5.1 or 7.1 output instead of being mixed down to stereo.
-- Quitting from Moonlight closes the game, puts the monitors back and starts EasyEffects again.
+- **Stream Display** shows games on the main monitor, which switches to each stream's resolution, refresh rate and HDR or SDR while other monitors are turned off, or on a dummy plug, which leaves your monitors as they are and keeps your windows off the stream.
+- A dummy plug's resolutions, refresh rates and HDR support are shown, and **Act As** can make it a 4K HDR display at 60 Hz, or 1440p or 1080p HDR at 120 Hz. This installs display information (EDID) for it in `/usr/lib/firmware/edid/` and adds the `drm.edid_firmware` boot option, and asks for your password. It works with AMD, Intel and NVIDIA graphics.
+- **Resolution** matches each Moonlight client, or is fixed. **Sound** plays games straight into Sunshine's 5.1 or 7.1 output with EasyEffects quit, or through EasyEffects in stereo. The dock and notification banners are hidden during streams unless you turn this off.
+- Quitting from Moonlight closes the game and puts the displays, EasyEffects, the dock and notifications back. Turn on HDR and surround sound in Moonlight on each client.
 
 ## Installing
 

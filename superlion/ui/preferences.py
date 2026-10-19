@@ -8,7 +8,7 @@ from .. import config as config_mod
 from .. import sgdb, steam_paths
 from .launch_options_prefs import LaunchOptionsPage
 from .sgdb_setup import SgdbKeySetup
-from .sunshine_status import SunshineGroup
+from .sunshine_status import StreamOptions, SunshineGroup
 from .webview import clear_sign_in
 from .wizard import (
     account_choice, apply_account, apply_install, install_choices, library_groups, region_choice,
@@ -27,6 +27,7 @@ class PreferencesDialog(Adw.PreferencesDialog):
         self.folder, self.command = install_choices(steam.add, self.state)
         steam.add(self._build_client_group())
         steam.add(SunshineGroup())
+        steam.add(StreamOptions(self.state, lambda text: self.add_toast(Adw.Toast(title=text))))
         self.account = account_choice(steam.add, self.state)
         self.collect_libraries = library_groups(steam.add, self.state, lambda: self)
         self.add(steam)
