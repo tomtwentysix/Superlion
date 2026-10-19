@@ -406,6 +406,64 @@ CATALOGUE = dict([
 ])
 
 
+# Settings whose value is a list: the separator, and items to offer.
+LISTS = {
+    "VKD3D_CONFIG": (",", ["dxr", "nodxr", "force_static_cbv", "single_queue", "no_upload_hvv",
+                           "pipeline_library_app_cache", "small_vram_rebar"]),
+    "DXVK_HUD": (",", ["fps", "frametimes", "gpuload", "memory", "devinfo", "version", "api", "compiler", "full"]),
+    "MANGOHUD_CONFIG": (",", ["fps_limit=60", "fps", "frametime", "gpu_stats", "cpu_stats", "vram", "ram", "no_display"]),
+    "RADV_PERFTEST": (",", ["gpl", "rt", "sam", "nggc", "video_decode"]),
+    "WINE_AUDIO_DRIVER": (",", ["pipewire", "pulse", "alsa"]),
+    "WINE_BLOCK_HOSTS": (",", []),
+    "DXVK_NVAPI_DRS_SETTINGS": (",", []),
+    "PROTON_OPTISCALER_CONFIG": (";", []),
+    "VK_INSTANCE_LAYERS": (":", []),
+    "PRESSURE_VESSEL_FILESYSTEMS_RW": (":", []),
+}
+# Settings with a known set of values, as [(value, label)].
+CHOICES = {
+    "WINEALSA_CHANNELS": [("2", "2 (Stereo)"), ("4", "4"), ("6", "6 (5.1)"), ("8", "8 (7.1)")],
+    "AMD_VULKAN_ICD": [("RADV", "RADV (Mesa)"), ("AMDVLK", "AMDVLK (AMD)")],
+    "SDL_VIDEODRIVER": [("wayland", "Wayland"), ("x11", "X11")],
+    "PROTON_OPTISCALER_NAME": [("dxgi.dll", "dxgi.dll"), ("d3d12.dll", "d3d12.dll"), ("dbghelp.dll", "dbghelp.dll")],
+    "WINE_FULLSCREEN_FSR_STRENGTH": [("0", "0 (Sharpest)"), ("1", "1"), ("2", "2 (Default)"), ("3", "3"),
+                                     ("4", "4"), ("5", "5 (Softest)")],
+    "VKD3D_FEATURE_LEVEL": [(level, level) for level in ("11_0", "11_1", "12_0", "12_1", "12_2")],
+    "DXVK_NVAPI_DRS_NGX_DLSS_SR_OVERRIDE": [("on", "On"), ("off", "Off")],
+    "DXVK_NVAPI_DRS_NGX_DLSS_SR_OVERRIDE_RENDER_PRESET_SELECTION": [
+        ("render_preset_default", "Default"),
+        *((f"render_preset_{p}", f"Preset {p.upper()}") for p in "jklm"),
+    ],
+}
+# WINEDLLOVERRIDES load orders: which copy of a DLL is used.
+DLL_ORDERS = [
+    ("n,b", "Game's Copy First"),
+    ("b,n", "Wine's Copy First"),
+    ("n", "Game's Copy Only"),
+    ("b", "Wine's Copy Only"),
+    ("", "Disabled"),
+]
+
+
+def split_dll_overrides(value):
+    """[(dll, load order)] from a value such as "dxgi,dinput8=n,b;d3d11=b". A DLL without an order gets n,b."""
+    items = []
+    for part in value.strip("\"'").split(";"):
+        names, equals, order = part.partition("=")
+        for name in names.split(","):
+            if name.strip():
+                items.append((name.strip(), order.strip() if equals else "n,b"))
+    return items
+
+
+def join_dll_overrides(items):
+    """The value for [(dll, load order)], DLLs with the same order sharing one entry."""
+    orders = {}
+    for name, order in items:
+        orders.setdefault(order, []).append(name)
+    return ";".join(f"{','.join(names)}={order}" for order, names in orders.items())
+
+
 @dataclass
 class Custom:
     kind: str

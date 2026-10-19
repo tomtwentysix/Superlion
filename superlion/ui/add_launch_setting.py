@@ -17,7 +17,7 @@ class AddLaunchSettingDialog(Adw.Dialog):
     __gsignals__ = {"added": (GObject.SignalFlags.RUN_FIRST, None, (object,))}
 
     def __init__(self, present, for_game=True):
-        super().__init__(title="Add Setting", content_width=600, content_height=720)
+        super().__init__(title="Add Custom Setting", content_width=600, content_height=720)
         self.present_keys = set(present)
         self.for_game = for_game
         self.add_button = Gtk.Button(label="Add", sensitive=False)
@@ -42,7 +42,7 @@ class AddLaunchSettingDialog(Adw.Dialog):
 
     def _build_custom(self):
         group = Adw.PreferencesGroup(
-            title="Your Own Setting",
+            title="Custom Setting",
             description=(
                 "It is offered for every game" + (", and switched on for this one." if self.for_game else ".")
             ),
