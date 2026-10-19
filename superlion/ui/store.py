@@ -10,11 +10,21 @@ from .webview import SteamWebPage
 
 CATEGORIES = [
     ("specials", "Specials", "superlion-sale-symbolic"),
-    ("new_releases", "New and Trending", "document-new-symbolic"),
-    ("top_sellers", "Top Sellers", "view-sort-descending-symbolic"),
+    ("new_releases", "New and Trending", "superlion-trending-symbolic"),
+    ("top_sellers", "Top Sellers", "superlion-top-sellers-symbolic"),
     ("coming_soon", "Coming Soon", "x-office-calendar-symbolic"),
 ]
-GENRES = ["Action", "Adventure", "RPG", "Strategy", "Simulation", "Racing", "Sports", "Indie", "VR"]
+GENRES = {
+    "Action": "superlion-genre-action-symbolic",
+    "Adventure": "superlion-genre-adventure-symbolic",
+    "RPG": "superlion-genre-rpg-symbolic",
+    "Strategy": "superlion-genre-strategy-symbolic",
+    "Simulation": "superlion-genre-simulation-symbolic",
+    "Racing": "superlion-genre-racing-symbolic",
+    "Sports": "superlion-genre-sports-symbolic",
+    "Indie": "superlion-genre-indie-symbolic",
+    "VR": "superlion-vr-symbolic",
+}
 SECTION_TITLES = {"you": "You", "browse": "Browse"}
 WISHLIST_SORTS = [
     ("Your Order", None),
@@ -153,9 +163,9 @@ class StoreView(Gtk.Box):
         self.sidebar_list.set_header_func(self._sidebar_header)
         self.rows = {}
         entries = (
-            [("featured", "Featured", "superlion-store-symbolic", "store")]
+            [("featured", "Featured", "superlion-featured-symbolic", "store")]
             + [(key, title, icon, "store") for key, title, icon in CATEGORIES]
-            + [("genre:Free to Play", "Free to Play", "applications-games-symbolic", "store"),
+            + [("genre:Free to Play", "Free to Play", "superlion-free-symbolic", "store"),
                ("wishlist", "Wishlist", "starred-symbolic", "you"),
                ("cart", "Cart", "superlion-cart-symbolic", "you")]
         )
@@ -173,7 +183,7 @@ class StoreView(Gtk.Box):
     def _add_genres(self):
         for genre in self.genres:
             key = f"genre:{genre}"
-            self.rows[key] = SidebarRow(key, genre, "folder-symbolic", "browse")
+            self.rows[key] = SidebarRow(key, genre, GENRES[genre], "browse")
             self.sidebar_list.append(self.rows[key])
 
     def sort_genres(self, games):
