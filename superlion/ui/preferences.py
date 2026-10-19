@@ -19,7 +19,7 @@ class PreferencesDialog(Adw.PreferencesDialog):
     """Settings from the setup wizard, plus sign-ins, applied when the window closes."""
 
     def __init__(self, window):
-        super().__init__(title="Preferences", search_enabled=False)
+        super().__init__(title="Preferences", search_enabled=False, content_width=760)
         self.window = window
         self.state = copy.deepcopy(window.config)
 

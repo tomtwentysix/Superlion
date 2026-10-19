@@ -1,5 +1,5 @@
 Name:           superlion
-Version:        0.9.2
+Version:        0.9.3
 Release:        1%{?dist}
 Summary:        Native GNOME front end for your Steam library
 License:        GPL-3.0-or-later
@@ -63,6 +63,9 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/uk.co.solarflareit.Su
 %{_datadir}/icons/hicolor/*/apps/uk.co.solarflareit.Superlion*
 
 %changelog
+* Mon Oct 19 2026 Tom <tom@solarflareit.co.uk> - 0.9.3-1
+- Widen Preferences so every page title fits.
+
 * Mon Oct 19 2026 Tom <tom@solarflareit.co.uk> - 0.9.2-1
 - Simplify setup: lead with the Steam installation found and its package type, rename Steam's folder to the Steam Data Folder, explain what to do before anyone has signed in to Steam, and show Sunshine's status like the other pages. Move streaming settings to a Streaming page in Preferences. Start Steam only when needed for new installs, and say in Downloads when updates are paused because Steam is closed.
 - Group launch options more finely, warn about settings that conflict, rename misspelt and old names such as PROTON_ENABLE_HDR, and name games outside the library. Global Settings lists every setting by category with search and warnings. Edit DLL overrides and other lists one item per row, and choose audio outputs and other known values from drop-downs.
