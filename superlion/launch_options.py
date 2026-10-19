@@ -12,6 +12,7 @@ import json
 import os
 import re
 from collections import Counter
+from itertools import combinations
 from dataclasses import asdict, dataclass, field
 from functools import cache
 from pathlib import Path
@@ -38,7 +39,11 @@ CATEGORIES = [
     "Performance and Latency",
     "NVIDIA",
     "AMD",
-    "Proton and Wine",
+    "DirectX and OpenGL",
+    "Mods and DLLs",
+    "Compatibility Fixes",
+    "Videos and Cutscenes",
+    "Online and Anti-Cheat",
     "Input",
     "Audio",
     "VR",
@@ -48,7 +53,7 @@ CATEGORIES = [
 ]
 
 # Categories from earlier versions, for settings the user added then.
-OLD_CATEGORIES = {"NVIDIA and DLSS": "NVIDIA"}
+OLD_CATEGORIES = {"NVIDIA and DLSS": "NVIDIA", "Proton and Wine": "Compatibility Fixes"}
 
 
 @dataclass
@@ -100,10 +105,6 @@ CATALOGUE = dict([
     _env(
         "DXVK_NO_HDR", "Turn Off HDR", "Display and HDR",
         "Keeps HDR off even where Proton would turn it on.",
-    ),
-    _env(
-        "PROTON_ENABLE_HDR", "Proton HDR (Old Name)", "Display and HDR",
-        "Turned on HDR in older Proton builds. Proton-CachyOS now uses HDR (DXVK_HDR) instead.",
     ),
     _env(
         "ENABLE_HDR_WSI", "HDR Vulkan Layer", "Display and HDR",
@@ -195,6 +196,14 @@ CATALOGUE = dict([
         "PROTON_LOCAL_SHADER_CACHE", "Game Shader Cache", "Performance and Latency",
         "Keeps a shader cache for this game in its Steam library, even when Steam's shader pre-caching is off.",
     ),
+    _env(
+        "PROTON_NO_FSYNC", "Turn Off Fsync", "Performance and Latency",
+        "Turns off futex synchronisation, which fixes some games.",
+    ),
+    _env(
+        "PROTON_NO_ESYNC", "Turn Off Esync", "Performance and Latency",
+        "Turns off eventfd synchronisation, which fixes some games in older Proton versions.",
+    ),
 
     # NVIDIA only
     _program("prime-run", "NVIDIA PRIME", "NVIDIA", "Runs the game on the NVIDIA graphics card of a laptop."),
@@ -271,73 +280,71 @@ CATALOGUE = dict([
         "Experimental features of Mesa's AMD driver, separated by commas.", "",
     ),
 
-    # Proton and Wine
+    # DirectX and OpenGL
     _env(
-        "LD_PRELOAD", "Clear Preloaded Libraries", "Proton and Wine",
-        'Set to "" to stop libraries such as the Steam overlay being loaded into the game.', '""',
+        "PROTON_USE_WINED3D", "WineD3D", "DirectX and OpenGL",
+        "1 draws DirectX 9 to 11 through OpenGL with WineD3D instead of DXVK; 0 keeps DXVK.",
+    ),
+    _env("PROTON_NO_D3D11", "Turn Off DirectX 11", "DirectX and OpenGL", "Makes games that can fall back to DirectX 9 do so."),
+    _env("PROTON_NO_D3D10", "Turn Off DirectX 10", "DirectX and OpenGL", "Makes games that can fall back to DirectX 9 do so."),
+    _env("PROTON_DXVK_D3D8", "DXVK for DirectX 8", "DirectX and OpenGL", "Runs DirectX 8 games through DXVK."),
+    _env("PROTON_D7VK_DDRAW", "D7VK for DirectX 7", "DirectX and OpenGL", "Runs DirectX 7 and older games through D7VK."),
+    _env(
+        "PROTON_DXVK_SAREK", "DXVK for Older Graphics Cards", "DirectX and OpenGL",
+        "Uses dxvk-sarek, for cards limited to Vulkan 1.1 or 1.2. Not for games with anti-cheat or multiplayer.",
+    ),
+    _env("VKD3D_CONFIG", "VKD3D-Proton Options", "DirectX and OpenGL", "VKD3D-Proton options for DirectX 12 games, such as dxr.", ""),
+    _env(
+        "VKD3D_FEATURE_LEVEL", "DirectX 12 Feature Level", "DirectX and OpenGL",
+        "The DirectX 12 feature level reported to games, such as 12_0.", "12_0",
     ),
     _env(
-        "WINEDLLOVERRIDES", "DLL Overrides", "Proton and Wine",
+        "PROTON_OLD_GL_STRING", "Short OpenGL Extension List", "DirectX and OpenGL",
+        "Fixes older games that crash on a long list of OpenGL extensions.",
+    ),
+
+    # Mods and DLLs
+    _env(
+        "WINEDLLOVERRIDES", "DLL Overrides", "Mods and DLLs",
         "Loads the game's own copies of these DLLs (n) before Wine's (b), as mods such as ReShade need.", "",
     ),
     _env(
-        "WINE_DLL_OVERRIDES", "DLL Overrides (Misspelt)", "Proton and Wine",
-        "Wine does not read this name. Use DLL Overrides (WINEDLLOVERRIDES) instead.", "",
+        "LD_PRELOAD", "Clear Preloaded Libraries", "Mods and DLLs",
+        'Set to "" to stop libraries such as the Steam overlay being loaded into the game.', '""',
     ),
+
+    # Compatibility fixes
     _env(
-        "PROTON_USE_WINED3D", "WineD3D", "Proton and Wine",
-        "1 draws DirectX 9 to 11 through OpenGL with WineD3D instead of DXVK; 0 keeps DXVK.",
-    ),
-    _env("PROTON_NO_D3D11", "Turn Off DirectX 11", "Proton and Wine", "Makes games that can fall back to DirectX 9 do so."),
-    _env("PROTON_NO_D3D10", "Turn Off DirectX 10", "Proton and Wine", "Makes games that can fall back to DirectX 9 do so."),
-    _env("PROTON_DXVK_D3D8", "DXVK for DirectX 8", "Proton and Wine", "Runs DirectX 8 games through DXVK."),
-    _env("PROTON_D7VK_DDRAW", "D7VK for DirectX 7", "Proton and Wine", "Runs DirectX 7 and older games through D7VK."),
-    _env(
-        "PROTON_DXVK_SAREK", "DXVK for Older Graphics Cards", "Proton and Wine",
-        "Uses dxvk-sarek, for cards limited to Vulkan 1.1 or 1.2. Not for games with anti-cheat or multiplayer.",
-    ),
-    _env("VKD3D_CONFIG", "VKD3D-Proton Options", "Proton and Wine", "VKD3D-Proton options for DirectX 12 games, such as dxr.", ""),
-    _env(
-        "VKD3D_FEATURE_LEVEL", "DirectX 12 Feature Level", "Proton and Wine",
-        "The DirectX 12 feature level reported to games, such as 12_0.", "12_0",
-    ),
-    _env("PROTON_NO_FSYNC", "Turn Off Fsync", "Proton and Wine", "Turns off futex synchronisation, which fixes some games."),
-    _env(
-        "PROTON_NO_ESYNC", "Turn Off Esync", "Proton and Wine",
-        "Turns off eventfd synchronisation, which fixes some games in older Proton versions.",
-    ),
-    _env("PROTON_USE_WOW64", "WoW64 Mode", "Proton and Wine", "Runs 32-bit Windows code with Wine's newer WoW64 mode."),
-    _env("PROTON_USE_EAC_LINUX", "Easy Anti-Cheat for Linux", "Proton and Wine", "Uses the Linux Easy Anti-Cheat runtime."),
-    _env(
-        "PROTON_FORCE_LARGE_ADDRESS_AWARE", "Large Address Aware", "Proton and Wine",
+        "PROTON_FORCE_LARGE_ADDRESS_AWARE", "Large Address Aware", "Compatibility Fixes",
         "Lets 32-bit games use up to 4 GB of memory. On by default in current Proton.",
     ),
     _env(
-        "PROTON_HEAP_DELAY_FREE", "Delay Freeing Memory", "Proton and Wine",
+        "PROTON_HEAP_DELAY_FREE", "Delay Freeing Memory", "Compatibility Fixes",
         "Works around crashes in games that use memory after freeing it.",
     ),
-    _env("PROTON_SET_GAME_DRIVE", "Game Drive", "Proton and Wine", "Adds an S: drive for the Steam library the game is in."),
+    _env("PROTON_USE_WOW64", "WoW64 Mode", "Compatibility Fixes", "Runs 32-bit Windows code with Wine's newer WoW64 mode."),
+    _env("PROTON_SET_GAME_DRIVE", "Game Drive", "Compatibility Fixes", "Adds an S: drive for the Steam library the game is in."),
     _env(
-        "PROTON_OLD_GL_STRING", "Short OpenGL Extension List", "Proton and Wine",
-        "Fixes older games that crash on a long list of OpenGL extensions.",
-    ),
-    _env(
-        "WINE_DO_NOT_CREATE_DXGI_DEVICE_MANAGER", "Video Playback Fix", "Proton and Wine",
-        "Works around videos that do not play in some games.",
-    ),
-    _env("PROTON_MEDIA_FORCE_GST", "GStreamer Video", "Proton and Wine", "Fixes video and sound in some cutscenes."),
-    _env(
-        "HOST_LC_ALL", "Game Language and Region", "Proton and Wine",
+        "HOST_LC_ALL", "Game Language and Region", "Compatibility Fixes",
         "Runs the game with this locale, such as ja_JP.UTF-8.", "en_GB.UTF-8",
     ),
+
+    # Videos and cutscenes
     _env(
-        "WINE_BLOCK_HOSTS", "Block Internet Hosts", "Proton and Wine",
+        "WINE_DO_NOT_CREATE_DXGI_DEVICE_MANAGER", "Video Playback Fix", "Videos and Cutscenes",
+        "Works around videos that do not play in some games.",
+    ),
+    _env("PROTON_MEDIA_FORCE_GST", "GStreamer Video", "Videos and Cutscenes", "Fixes video and sound in some cutscenes."),
+
+    # Online and anti-cheat
+    _env("PROTON_USE_EAC_LINUX", "Easy Anti-Cheat for Linux", "Online and Anti-Cheat", "Uses the Linux Easy Anti-Cheat runtime."),
+    _env(
+        "WINE_BLOCK_HOSTS", "Block Internet Hosts", "Online and Anti-Cheat",
         "Stops the game connecting to these hosts, separated by commas.", "",
     ),
-    _env("PROTON_DISCORD_BRIDGE", "Discord Rich Presence", "Proton and Wine", "Lets the game show what you are playing in Discord."),
     _env(
-        "PROTON_USE_XALIA", "Xalia Controller Interface", "Proton and Wine",
-        "1 adds Xalia's controller interface to programs made for keyboard and mouse; 0 turns it off.",
+        "PROTON_DISCORD_BRIDGE", "Discord Rich Presence", "Online and Anti-Cheat",
+        "Lets the game show what you are playing in Discord.",
     ),
 
     # Input
@@ -348,6 +355,10 @@ CATALOGUE = dict([
     _env(
         "WINE_MOUSE_GRAB", "Keep Mouse in Window", "Input",
         "Locks the mouse to the game window, so it cannot drift to another monitor or break mouse-look.",
+    ),
+    _env(
+        "PROTON_USE_XALIA", "Xalia Controller Interface", "Input",
+        "1 adds Xalia's controller interface to programs made for keyboard and mouse; 0 turns it off.",
     ),
 
     # Audio
@@ -545,6 +556,15 @@ NOT_NEEDED, BREAKS = "not-needed", "breaks"
 GRAPHICS_VENDORS = {"0x10de": "NVIDIA", "0x1002": "AMD", "0x8086": "Intel"}
 
 HDR_VARIABLES = ["DXVK_HDR", "PROTON_ENABLE_HDR", "ENABLE_HDR_WSI"]
+# Misspelt and old names: the name to use instead, and why.
+RENAMES = {
+    "WINE_DLL_OVERRIDES": ("WINEDLLOVERRIDES", "Wine does not read this name. Use DLL Overrides (WINEDLLOVERRIDES)."),
+    "PROTON_ENABLE_HDR": (
+        "DXVK_HDR", "An old name for HDR (DXVK_HDR). Only GE-Proton still reads it; other Protons ignore it.",
+    ),
+}
+# Settings that only DXVK reads, which do nothing when WineD3D replaces it.
+DXVK_SETTINGS = ["DXVK_HDR", "DXVK_NO_HDR", "DXVK_HUD", "DXVK_FRAME_RATE", "PROTON_DXVK_LOWLATENCY", "PROTON_DXVK_D3D8"]
 # Each setting, and the setting it undoes when both are on.
 OPPOSITES = {
     "PROTON_DISABLE_NVAPI": "PROTON_ENABLE_NVAPI",
@@ -602,9 +622,9 @@ def warnings(options, custom=None):
     def warn(name, kind, rule, text, setting_kind=ENV):
         found.append(LaunchWarning((setting_kind, name), kind, rule, text))
 
-    def named(name):
-        title = setting_for(ENV, name, custom).title
-        return f"{title} ({name})" if title != name else name
+    def named(kind, name):
+        title = setting_for(kind, name, custom).title
+        return f"{title} ({name})" if kind == ENV and title != name else title
 
     for name, count in Counter(name for name, _value in parsed.env).items():
         if count > 1:
@@ -616,8 +636,9 @@ def warnings(options, custom=None):
         if category in ("NVIDIA", "AMD") and vendors and category not in vendors:
             warn(key, NOT_NEEDED, "vendor", f"No {category} graphics card was found.", kind)
 
-    if "WINE_DLL_OVERRIDES" in env:
-        warn("WINE_DLL_OVERRIDES", NOT_NEEDED, "misspelt", "Wine does not read this name. Use DLL Overrides (WINEDLLOVERRIDES).")
+    for name, (_new, text) in RENAMES.items():
+        if name in env:
+            warn(name, NOT_NEEDED, "rename", text)
     if env.get("PROTON_USE_PIPEWIRE") == "1":
         warn("PROTON_USE_PIPEWIRE", NOT_NEEDED, "default", "PipeWire audio is already the default.")
 
@@ -632,7 +653,11 @@ def warnings(options, custom=None):
 
     for name, opposite in OPPOSITES.items():
         if name in on and opposite in on:
-            warn(name, BREAKS, "opposite", f"Undoes {named(opposite)}, which is also set.")
+            warn(name, BREAKS, "opposite", f"Undoes {named(ENV, opposite)}, which is also set.")
+
+    for first, second, reason in conflicts(parsed, on):
+        for (kind, key), (other_kind, other) in ((first, second), (second, first)):
+            warn(key, BREAKS, f"conflict-{other}", f"Conflicts with {named(other_kind, other)}. {reason}", kind)
 
     if "LD_PRELOAD" in env and not env["LD_PRELOAD"].strip("\"'"):
         warn(
@@ -641,6 +666,37 @@ def warnings(options, custom=None):
         )
     if "PROTON_PREFER_SDL" in on:
         warn("PROTON_PREFER_SDL", BREAKS, "steam-input", "Controller layouts set in Steam Input are not used.")
+    return found
+
+
+def conflicts(parsed, on):
+    """Pairs of settings that work against each other, as [((kind, key), (kind, key), reason)]."""
+    gamescope = (WRAPPER, "gamescope")
+    gamescope_options = tokenize(parsed.wrappers.get("gamescope", "")) if "gamescope" in parsed.wrappers else None
+    found = []
+    if gamescope_options is not None:
+        if "PROTON_ENABLE_WAYLAND" in on and "--expose-wayland" not in gamescope_options:
+            found.append((gamescope, (ENV, "PROTON_ENABLE_WAYLAND"),
+                          "Games in a Wayland window do not start inside Gamescope without its --expose-wayland option."))
+        if "--mangoapp" in gamescope_options:
+            for key in [(WRAPPER, "mangohud")] * ("mangohud" in parsed.wrappers) + [(ENV, "MANGOHUD")] * ("MANGOHUD" in on):
+                found.append((gamescope, key, "Gamescope's --mangoapp shows MangoHud already."))
+        if "--hdr-enabled" in gamescope_options and "ENABLE_HDR_WSI" in on:
+            found.append((gamescope, (ENV, "ENABLE_HDR_WSI"),
+                          "Gamescope outputs HDR itself, and the HDR Vulkan layer can stop games starting inside it."))
+    if "PROTON_USE_WINED3D" in on:
+        for name in DXVK_SETTINGS:
+            if name in on:
+                found.append(((ENV, "PROTON_USE_WINED3D"), (ENV, name), "WineD3D replaces DXVK, so DXVK's settings do nothing."))
+    limits = [(ENV, "DXVK_FRAME_RATE")] * ("DXVK_FRAME_RATE" in on)
+    if gamescope_options and {"-r", "--framerate-limit"} & set(gamescope_options):
+        limits.append(gamescope)
+    if "fps_limit=" in dict(parsed.env).get("MANGOHUD_CONFIG", ""):
+        limits.append((ENV, "MANGOHUD_CONFIG"))
+    if "strangle" in parsed.wrappers:
+        limits.append((WRAPPER, "strangle"))
+    for first, second in combinations(limits, 2):
+        found.append((first, second, "Two frame rate limits work against each other."))
     return found
 
 
@@ -775,11 +831,11 @@ def summary(options, custom=None):
 
 
 def fix_label(warning):
-    return {"duplicate": "Keep Last", "misspelt": "Rename"}.get(warning.rule, "Remove")
+    return {"duplicate": "Keep Last", "rename": "Rename"}.get(warning.rule, "Remove")
 
 
 def fix(options, warning):
-    """The launch options with the warning's setting removed; a duplicate keeps its last value and a misspelt name is corrected."""
+    """The launch options with the warning's setting removed; a duplicate keeps its last value and an old name is replaced."""
     parsed = parse(options, custom_programs())
     kind, key = warning.key
     if kind == ENV:
@@ -790,8 +846,8 @@ def fix(options, warning):
                 env.append((name, value))
             elif warning.rule == "duplicate" and i == last:
                 env.append((name, value))
-            elif warning.rule == "misspelt" and i == last and "WINEDLLOVERRIDES" not in dict(parsed.env):
-                env.append(("WINEDLLOVERRIDES", value))
+            elif warning.rule == "rename" and i == last and RENAMES[key][0] not in dict(parsed.env):
+                env.append((RENAMES[key][0], value))
         parsed.env = env
     elif kind == WRAPPER:
         parsed.wrappers.pop(key, None)

@@ -2,6 +2,7 @@
 
 from gi.repository import Adw, GLib, Gtk
 
+from .. import appinfo, auth, game_names
 from .. import launch_options as lo
 from .. import launch_presets
 from .add_launch_setting import AddLaunchSettingDialog
@@ -41,6 +42,7 @@ class LaunchOptionsPage(Adw.PreferencesPage):
         self.window = window
         self.groups = []
         self.expanded = set()  # Games whose warnings are shown, kept open across refreshes.
+        self.looked_up = set()  # App IDs whose names were asked of the store this time.
         self.refresh()
 
     def refresh(self):
@@ -48,12 +50,18 @@ class LaunchOptionsPage(Adw.PreferencesPage):
             self.remove(group)
         config = self.window.config
         self.configured = launch_presets.configured_games(config) if config else {}
+        self.apps = appinfo.load(config.root) if config else {}
+        self.unnamed = set()
         self.groups = [
-            self._build_presets(), self._build_warnings(), self._build_used_settings(),
-            self._build_settings(), self._build_games(),
+            self._build_presets(), *self._build_warnings(), self._build_used_settings(),
+            self._build_settings(), *self._build_games(),
         ]
         for group in self.groups:
             self.add(group)
+        if self.unnamed - self.looked_up:
+            missing = self.unnamed - self.looked_up
+            self.looked_up |= missing
+            auth.run_async(lambda: game_names.look_up(sorted(missing)), lambda *_: self.refresh())
 
     def _build_presets(self):
         group = Adw.PreferencesGroup(
@@ -137,9 +145,13 @@ class LaunchOptionsPage(Adw.PreferencesPage):
         return group
 
     def _build_warnings(self):
+        """The Warnings group, and one for games that are not installed."""
         group = Adw.PreferencesGroup(
             title="Warnings",
             description="Settings in your games' launch options that are not needed on this computer, or cause problems.",
+        )
+        elsewhere = Adw.PreferencesGroup(
+            title="Not Installed", description="Warnings in launch options kept for games that are not installed.",
         )
         ignored = lo.ignored_warnings()
         entries = []
@@ -147,8 +159,9 @@ class LaunchOptionsPage(Adw.PreferencesPage):
             found = lo.warnings(options)
             if found:
                 entries.append((self._game_name(appid), appid, options, found))
-        if not entries:
+        if not any(self._installed(e[1]) for e in entries):
             group.add(Adw.ActionRow(title="No Warnings"))
+        elsewhere.set_visible(not all(self._installed(e[1]) for e in entries))
         for name, appid, options, found in sorted(entries, key=lambda e: e[0].casefold()):
             game_ignored = ignored.get(appid, set())
             count = sum(w.id not in game_ignored for w in found)
@@ -168,8 +181,8 @@ class LaunchOptionsPage(Adw.PreferencesPage):
             edit = Adw.ButtonRow(title="Edit Launch Options…")
             edit.connect("activated", lambda *_, a=appid, n=name, o=options: self._edit_game(a, n, o))
             expander.add_row(edit)
-            group.add(expander)
-        return group
+            (group if self._installed(appid) else elsewhere).add(expander)
+        return group, elsewhere
 
     def _remember_expanded(self, appid, expanded):
         if expanded:
@@ -251,21 +264,26 @@ class LaunchOptionsPage(Adw.PreferencesPage):
         dialog.present(self.dialog)
 
     def _build_games(self):
+        """The Your Games group, and one for games that are not installed."""
         group = Adw.PreferencesGroup(
             title="Your Games",
             description="Launch options set for your games. Choose one to change it, or to save it as a preset.",
+        )
+        elsewhere = Adw.PreferencesGroup(
+            title="Not Installed", description="Launch options Steam keeps for games that are not installed.",
         )
         entries = sorted(
             ((appid, self._game_name(appid), options) for appid, options in self.configured.items()),
             key=lambda entry: entry[1].casefold(),
         )
-        if not entries:
+        if not any(self._installed(e[0]) for e in entries):
             group.add(Adw.ActionRow(title="No games have launch options set."))
+        elsewhere.set_visible(not all(self._installed(e[0]) for e in entries))
         for appid, name, options in entries:
             row = _options_row(name, options, lambda a=appid, n=name, o=options: self._edit_game(a, n, o))
             existing = launch_presets.find_by_options(options)
             if existing:
-                saved = Gtk.Image(icon_name="emblem-ok-symbolic", tooltip_text=f"Saved as preset “{existing.name}”")
+                saved = Gtk.Image(icon_name="object-select-symbolic", tooltip_text=f"Saved as preset “{existing.name}”")
                 saved.add_css_class("dim-label")
                 row.add_suffix(saved)
             else:
@@ -273,12 +291,21 @@ class LaunchOptionsPage(Adw.PreferencesPage):
                     "media-floppy-symbolic", "Save as Preset", lambda n=name, o=options: self._new_preset(o, n)
                 ))
             _go_next(row)
-            group.add(row)
-        return group
+            (group if self._installed(appid) else elsewhere).add(row)
+        return group, elsewhere
 
     def _edit_game(self, appid, name, options):
         self._open_editor(LaunchOptionsEditor(self.window, options, game_name=name, appid=appid))
 
+    def _installed(self, appid):
+        game = self.window.find_game(appid)
+        return bool(game and game.props.installed)
+
     def _game_name(self, appid):
         game = self.window.find_game(appid)
-        return game.props.name if game else f"App {appid}"
+        if game:
+            return game.props.name
+        name = game_names.known(self.apps, appid)
+        if name is None:
+            self.unnamed.add(appid)
+        return game_names.display_name(name, appid)
