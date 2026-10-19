@@ -6,7 +6,7 @@ from .. import auth, steam_control, store_account, store_api
 from . import images
 from .library_view import SidebarRow
 from .media import MediaCarousel, description_widgets
-from .webview import SteamWebPage
+from .webview import STATE_SCRIPT, WISHLIST_SCRIPT, SteamWebPage, run_in_store
 
 CATEGORIES = [
     ("specials", "Specials", "superlion-sale-symbolic"),
@@ -130,6 +130,7 @@ class StoreView(Gtk.Box):
         self.wishlist_ids = None  # The wishlist's app IDs in order, once loaded.
         self.wishlist_items = {}
         self.cart = None  # How many items are in the cart, once known.
+        self.signed_in = False
         self._serial = 0
         self.genres = list(GENRES)
         self.after_hours = False
@@ -302,24 +303,27 @@ class StoreView(Gtk.Box):
         self.refresh_counts()
 
     def refresh_counts(self):
-        config, region = self.window.config, self.window.store_region
+        config = self.window.config
         if config is None or not config.account_id:
             return
 
-        def work():
-            return store_account.wishlist(auth.steamid64(config)), store_account.cart_count(region)
-
-        def done(result, error):
-            if error or result is None:
+        def done(ids, error):
+            if error or ids is None:
                 if self.view == "wishlist":
                     self.stack.set_visible_child_name("error")
                 return
-            self.wishlist_ids, self.cart = result
+            self.wishlist_ids = ids
             self._show_counts()
             if self.view == "wishlist":
                 self._show_wishlist()
 
-        auth.run_async(work, done)
+        def with_state(state):
+            state = state or {}
+            self.signed_in, self.cart = state.get("signed_in", False), state.get("cart")
+            token = state.get("token", "")
+            auth.run_async(lambda: store_account.wishlist(auth.steamid64(config), token), done)
+
+        run_in_store(STATE_SCRIPT, {}, with_state)
 
     def _on_row_selected(self, _list, row):
         if row is None:
@@ -476,7 +480,7 @@ class StoreView(Gtk.Box):
             self.stack.set_visible_child_name("loading")
             return  # refresh_counts() shows it once loaded.
         if not self.wishlist_ids:
-            if store_account.signed_in():
+            if self.signed_in:
                 self._wishlist_message("Your Wishlist Is Empty", "Games you add to your wishlist appear here.")
             else:
                 self._wishlist_message(
@@ -547,15 +551,16 @@ class StoreView(Gtk.Box):
 
     def set_wishlisted(self, appid, name, add, done=None):
         """Add a game to the wishlist or remove it, signing in first if needed; done() after a change."""
-        if not store_account.signed_in():
-            self.window.open_web(LOGIN_URL, "Sign In")
-            self.window.toast("Sign in to the store to change your wishlist")
-            return
 
-        def finished(ok, error):
-            if error or not ok:
-                self.window.toast(f"Your wishlist could not be changed{': ' + str(error) if error else ''}")
+        def finished(result):
+            if result is not None and not result.get("signed_in"):
+                self.window.open_web(LOGIN_URL, "Sign In")
+                self.window.toast("Sign in to the store to change your wishlist")
                 return
+            if not (result and result.get("success")):
+                self.window.toast("Your wishlist could not be changed")
+                return
+            self.signed_in = True
             ids = self.wishlist_ids if self.wishlist_ids is not None else []
             self.wishlist_ids = [a for a in ids if a != appid] + ([appid] if add else [])
             self._show_counts()
@@ -565,7 +570,8 @@ class StoreView(Gtk.Box):
             if done:
                 done()
 
-        auth.run_async(lambda: store_account.set_wishlisted(appid, add), finished)
+        action = "addtowishlist" if add else "removefromwishlist"
+        run_in_store(WISHLIST_SCRIPT, {"appid": appid, "action": action}, finished)
 
     def _on_search_changed(self, entry):
         term = entry.get_text().strip()
