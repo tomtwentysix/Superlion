@@ -8,6 +8,8 @@ from . import game_collections, installer, steam_control, steam_settings
 
 # Queue key for "sync Superlion's collections to Steam"; app ID 0 is never a game.
 COLLECTIONS_KEY = 0
+# Queue key for "Steam must restart to see a changed compatibilitytools.d"; written nowhere.
+TOOLS_KEY = -1
 
 PENDING_PATH = config_mod.data_dir() / "pending.json"
 
@@ -48,6 +50,15 @@ def add_collections_sync(include_own=True):
     add(COLLECTIONS_KEY, {"sync_collections": True, "include_own": include_own})
 
 
+def add_tools_restart():
+    add(TOOLS_KEY, {"compat_tools": True})
+
+
+def only_tools_waiting():
+    queue = load()
+    return bool(queue) and set(queue) == {TOOLS_KEY}
+
+
 def collections_waiting():
     return bool(load().get(COLLECTIONS_KEY))
 
@@ -66,6 +77,8 @@ def apply_now(config):
     if config_mod.SCREENSHOTS:
         return 0
     queue = load()
+    if queue.pop(TOOLS_KEY, None):
+        _save(queue)
     applied = len(queue)
     sync = queue.pop(COLLECTIONS_KEY, None)
     if sync:

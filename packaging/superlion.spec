@@ -1,5 +1,5 @@
 Name:           superlion
-Version:        0.9.7
+Version:        0.9.8
 Release:        1%{?dist}
 Summary:        Native GNOME front end for your Steam library
 License:        GPL-3.0-or-later
@@ -65,6 +65,11 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/uk.co.solarflareit.Su
 %{_datadir}/dnf5/repos.override.d/50-superlion.repo
 
 %changelog
+* Tue Oct 20 2026 Tom <tom@solarflareit.co.uk> - 0.9.8-1
+- Manage Proton builds in Preferences: see installed compatibility tools and their versions, install and update GE-Proton and Proton-CachyOS, with checksums verified before unpacking.
+- Show family library games that are not installed.
+- Offer to remove old or misspelt setting names as well as rename them.
+- Show running downloads and their progress correctly, and fix the game page's menu.
 * Mon Oct 19 2026 Tom <tom@solarflareit.co.uk> - 0.9.7-1
 - Add programs to Steam from Files with a new Add to Steam script, turned on in Preferences. Each program gets a name and compatibility tool, and Flatpak Steam can be given access to its folder.
 
