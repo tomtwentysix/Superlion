@@ -6,11 +6,12 @@ switches, and switching settings on and off rewrites the text, so either way
 of working can be used at any time.
 """
 
-from gi.repository import Adw, GLib, GObject, Gtk, Pango
+from gi.repository import Adw, GLib, GObject, Gtk
 
 from .. import launch_options as lo
 from .. import launch_presets
 from .add_launch_setting import AddLaunchSettingDialog
+from .value_editors import value_editor
 
 PARSE_DELAY = 300  # milliseconds after the last keystroke
 
@@ -131,7 +132,7 @@ class LaunchOptionsEditor(Adw.Dialog):
         self.done_button = Gtk.Button(label="Save" if self.for_preset or appid is not None else "Done")
         self.done_button.add_css_class("suggested-action")
         self.done_button.connect("clicked", lambda *_: self._on_done())
-        add = Gtk.Button(icon_name="list-add-symbolic", tooltip_text="Add Setting")
+        add = Gtk.Button(icon_name="list-add-symbolic", tooltip_text="Add Custom Setting")
         add.connect("clicked", lambda *_: self._open_add())
         header = Adw.HeaderBar(show_start_title_buttons=False, show_end_title_buttons=False)
         header.pack_start(cancel)
@@ -287,7 +288,7 @@ class LaunchOptionsEditor(Adw.Dialog):
             self.searchable.append((group, entries))
             self.category_groups.append(group)
         more = Adw.PreferencesGroup()
-        add = Adw.ButtonRow(title="Add Setting…", start_icon_name="list-add-symbolic")
+        add = Adw.ButtonRow(title="Add Custom Setting…", start_icon_name="list-add-symbolic")
         add.connect("activated", lambda *_: self._open_add())
         more.add(add)
         self.category_groups.append(more)
@@ -372,15 +373,12 @@ class LaunchOptionsEditor(Adw.Dialog):
         row.connect(
             "notify::enable-expansion", lambda r, _p: self._on_row_changed(key, enabled=r.get_enable_expansion())
         )
-        entry = Adw.EntryRow(title="Options" if setting.kind == lo.WRAPPER else "Value", text=state["value"])
-        entry.connect("changed", lambda e: self._on_row_changed(key, value=e.get_text().strip()))
-        values = [v for v, _n in setting.values.most_common()]
-        if len(values) > 1 or (values and values[0] != state["value"]):
-            entry.add_suffix(self._values_button(entry, values))
-        row.add_row(entry)
+        editor = value_editor(row, setting, state["value"], lambda value: self._on_row_changed(key, value=value))
+        if not state["enabled"]:
+            state["value"] = editor.value  # Such as the first audio output, when no game sets one.
         self._add_warning_icon(row, key)
         self._add_remove_button(row, setting)
-        self.rows[key] = (row, entry)
+        self.rows[key] = (row, editor)
         return row
 
     def _add_warning_icon(self, row, key):
@@ -391,14 +389,13 @@ class LaunchOptionsEditor(Adw.Dialog):
 
     def _refresh_rows(self):
         self._syncing = True
-        for key, (row, entry) in self.rows.items():
+        for key, (row, editor) in self.rows.items():
             state = self.state[key]
-            if entry is None:
+            if editor is None:
                 row.set_active(state["enabled"])
             else:
                 row.set_enable_expansion(state["enabled"])
-                if entry.get_text() != state["value"]:
-                    entry.set_text(state["value"])
+                editor.set_value(state["value"])
         self._syncing = False
 
     def _on_row_changed(self, key, enabled=None, value=None):
@@ -414,34 +411,11 @@ class LaunchOptionsEditor(Adw.Dialog):
         if not setting.custom:
             return
         button = Gtk.Button(
-            icon_name="user-trash-symbolic", tooltip_text="Remove from Every Game's List", valign=Gtk.Align.CENTER
+            icon_name="user-trash-symbolic", tooltip_text="Remove From Custom Settings", valign=Gtk.Align.CENTER
         )
         button.add_css_class("flat")
         button.connect("clicked", lambda *_: self._remove(setting))
         row.add_suffix(button)
-
-    def _values_button(self, entry, values):
-        """A menu of the values the user's games use, which fills the entry."""
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        popover = Gtk.Popover(child=box)
-        popover.add_css_class("menu")
-        heading = Gtk.Label(label="Used in Your Games", xalign=0, margin_start=12, margin_top=6, margin_bottom=6)
-        heading.add_css_class("dim-label")
-        heading.add_css_class("caption-heading")
-        box.append(heading)
-        for value in values:
-            label = Gtk.Label(label=value, xalign=0, ellipsize=Pango.EllipsizeMode.MIDDLE, max_width_chars=48)
-            label.add_css_class("monospace")
-            button = Gtk.Button(child=label)
-            button.add_css_class("flat")
-            button.connect("clicked", lambda _b, v=value: (entry.set_text(v), popover.popdown()))
-            box.append(button)
-        button = Gtk.MenuButton(
-            icon_name="pan-down-symbolic", tooltip_text="Values Used in Your Games",
-            valign=Gtk.Align.CENTER, popover=popover,
-        )
-        button.add_css_class("flat")
-        return button
 
     def _build_top_group(self, options):
         if self.for_preset:

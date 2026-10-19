@@ -1,5 +1,8 @@
-"""Taking EasyEffects out of the way while Sunshine streams, and bringing it back."""
+"""Taking EasyEffects out of the way while Sunshine streams, and bringing it back,
+and listing this PC's audio outputs.
+"""
 
+import json
 import shutil
 import subprocess
 from pathlib import Path
@@ -61,3 +64,16 @@ def restore():
     command = _easyeffects()
     if command and not _running():
         detached([*command, "--hide-window"])
+
+
+def outputs():
+    """Audio outputs as [(sink name, description)], leaving out the ones Sunshine adds while streaming."""
+    try:
+        result = subprocess.run(["pactl", "--format=json", "list", "sinks"], capture_output=True, text=True, timeout=5)
+        sinks = json.loads(result.stdout)
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return []
+    return [
+        (sink["name"], sink.get("description") or sink["name"])
+        for sink in sinks if not sink["name"].startswith("sink-sunshine-")
+    ]
