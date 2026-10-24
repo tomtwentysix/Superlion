@@ -57,15 +57,15 @@ const response = method === "GetCart"
 return JSON.stringify({signed_in: true, ok: response.ok, response: response.ok ? (await response.json()).response : null});
 """
 # The store's sign-in for Superlion: whether the user is signed in, the Web API
-# token Steam's own pages use, and the cart's line items.
+# token Steam's own pages use, and the cart ({line_items, subtotal}).
 STATE_SCRIPT = """
 const config = document.getElementById("application_config");
 const user = config ? JSON.parse(config.dataset.store_user_config || "{}") : {};
-let cart = [];
+let cart = {};
 if (window.g_AccountID) {
     const url = "https://api.steampowered.com/IAccountCartService/GetCart/v1/";
     const response = await fetch(`${url}?access_token=${user.webapi_token}&user_country=${country}`);
-    cart = response.ok ? ((await response.json()).response.cart || {}).line_items || [] : [];
+    cart = response.ok ? (await response.json()).response.cart || {} : {};
 }
 return JSON.stringify({signed_in: Boolean(window.g_AccountID), token: user.webapi_token || "", cart});
 """
