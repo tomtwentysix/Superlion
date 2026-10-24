@@ -4,7 +4,6 @@ import json
 import os
 import shlex
 import shutil
-import signal
 import subprocess
 from pathlib import Path
 
@@ -211,44 +210,3 @@ def set_output(connector):
 
 def start():
     subprocess.run(["systemctl", "--user", "start", "--no-block", SERVICE], timeout=10)
-
-
-def _children(pid):
-    try:
-        tasks = os.listdir(f"/proc/{pid}/task")
-    except OSError:
-        return []
-    found = []
-    for task in tasks:
-        try:
-            found += [int(c) for c in Path(f"/proc/{pid}/task/{task}/children").read_text().split()]
-        except OSError:
-            pass
-    return found
-
-
-def close_game(appid):
-    """End a game Steam started, as Steam's own Stop does.
-
-    Steam runs every game under a "reaper SteamLaunch AppId=<id>" process, so
-    that process and everything below it make up the game.
-    """
-    marker = f"AppId={appid}".encode()
-    for entry in os.listdir("/proc"):
-        if not entry.isdigit():
-            continue
-        try:
-            args = Path(f"/proc/{entry}/cmdline").read_bytes().split(b"\0")
-        except OSError:
-            continue
-        if len(args) > 2 and os.path.basename(args[0]) == b"reaper" and marker in args:
-            pids, queue = [], [int(entry)]
-            while queue:
-                pid = queue.pop()
-                pids.append(pid)
-                queue += _children(pid)
-            for pid in reversed(pids):
-                try:
-                    os.kill(pid, signal.SIGTERM)
-                except OSError:
-                    pass

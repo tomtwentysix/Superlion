@@ -31,9 +31,9 @@ if sys.argv[1:] == ["--sunshine-restore"]:
     audio.restore()
     sys.exit(0)
 if sys.argv[1:2] == ["--sunshine-close"] and len(sys.argv) == 3:
-    from . import sunshine
+    from . import steam_control
 
-    sunshine.close_game(int(sys.argv[2]))
+    steam_control.stop_game(int(sys.argv[2]))
     sys.exit(0)
 
 from .app import main  # noqa: E402

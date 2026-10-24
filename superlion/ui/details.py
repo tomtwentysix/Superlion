@@ -199,24 +199,32 @@ class GameDetailsPage(Adw.NavigationPage):
         return self.download_area
 
     def _watch_downloads(self):
-        """Keep Play in step with Steam's downloads while the page is open."""
-        self._download_timer = 0
-        if self.game.props.non_steam:
-            return  # Steam does not download non-Steam games.
+        """Keep Play in step with Steam's downloads and the running game while the page is open."""
         self._check_download()
         self._download_timer = GLib.timeout_add_seconds(2, self._check_download)
 
     def _check_download(self):
         config, appid = self.window.config, self.game.props.appid
-        auth.run_async(
-            lambda: (downloads.state_for(config, appid), downloads.current_rate(config)), self._show_download
-        )
+        # Steam does not download non-Steam games.
+        steam_game = not self.game.props.non_steam
+
+        def check():
+            running = appid in steam_control.running_games()
+            if running or not steam_game:
+                return None, None, running
+            return downloads.state_for(config, appid), downloads.current_rate(config), False
+
+        auth.run_async(check, self._show_download)
         return GLib.SOURCE_CONTINUE
 
     def _show_download(self, result, error):
         if error or not result or not hasattr(self, "primary"):
             return
-        item, rate = result
+        item, rate, running = result
+        self._set_running(running and self.game.props.installed)
+        if self.running:
+            self.download_area.set_visible(False)
+            return
         if item is None:
             self.primary.set_label(self.primary_label)
             self.primary.set_sensitive(True)
@@ -233,6 +241,33 @@ class GameDetailsPage(Adw.NavigationPage):
         # update is downloaded by Steam when the game is played.
         self.primary.set_sensitive(not busy)
         self.primary.set_tooltip_text("Steam is handling this; see the Downloads tab for details" if busy else None)
+
+    def _set_running(self, running):
+        if running == self.running:
+            return
+        self.running = running
+        self.primary.set_sensitive(True)
+        self.primary.set_tooltip_text(f"Stop {self.game.props.name}" if running else None)
+        self._show_stop(running and self._primary_hovered)
+        if not running:
+            self.primary.set_label(self.primary_label)
+
+    def _show_stop(self, stop):
+        """Running reads as "Stop" only while the pointer is over it."""
+        if stop:
+            self.primary.set_label("Stop")
+            self.primary.remove_css_class("suggested-action")
+            self.primary.add_css_class("destructive-action")
+        else:
+            if self.running:
+                self.primary.set_label("Running")
+            self.primary.remove_css_class("destructive-action")
+            self.primary.add_css_class("suggested-action")
+
+    def _on_primary_hover(self, hovered):
+        self._primary_hovered = hovered
+        if self.running and self.primary.get_sensitive():
+            self._show_stop(hovered)
 
     def release(self):
         if getattr(self, "_download_timer", 0):
@@ -366,6 +401,12 @@ class GameDetailsPage(Adw.NavigationPage):
         box.append(primary)
         self.primary = primary
         self.primary_label = primary.get_label()
+        self._primary_hovered = False
+        self.running = False  # The next check marks a new button as running.
+        hover = Gtk.EventControllerMotion()
+        hover.connect("enter", lambda *_: self._on_primary_hover(True))
+        hover.connect("leave", lambda *_: self._on_primary_hover(False))
+        primary.add_controller(hover)
         manager = mod_managers.linked(game.props.appid)
         if manager is not None:
             box.append(self._pill(
@@ -562,7 +603,23 @@ class GameDetailsPage(Adw.NavigationPage):
         self._update_settings_description()
 
     def _on_play(self, _button):
+        if self.running:
+            self._on_stop()
+            return
         self._open(self.game.run_uri, f"Launching {self.game.props.name}")
+
+    def _on_stop(self):
+        name = self.game.props.name
+        self.primary.set_sensitive(False)
+        self.primary.set_label("Stopping…")
+        self.window.toast(f"Stopping {name}")
+        auth.run_async(lambda: steam_control.stop_game(self.game.props.appid), self._stopped)
+
+    def _stopped(self, _result, _error):
+        # A game that ended is noticed by the next check; one still running can be stopped again.
+        if self.running and not self.primary.get_sensitive():
+            self.primary.set_sensitive(True)
+            self._show_stop(self._primary_hovered)
 
     def _on_install(self, _button):
         self.window.install_game(self.game.props.appid, self.game.props.name)

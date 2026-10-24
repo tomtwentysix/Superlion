@@ -2,6 +2,7 @@
 
 import os
 import shlex
+import signal
 import subprocess
 import time
 from pathlib import Path
@@ -148,3 +149,90 @@ def relaunch(config, while_closed, callback):
         GLib.timeout_add(1000, lambda: (start(config), callback(error), GLib.SOURCE_REMOVE)[-1])
 
     shutdown(config, closed)
+
+
+def _children(pid):
+    try:
+        tasks = os.listdir(f"/proc/{pid}/task")
+    except OSError:
+        return []
+    found = []
+    for task in tasks:
+        try:
+            found += [int(c) for c in Path(f"/proc/{pid}/task/{task}/children").read_text().split()]
+        except OSError:
+            pass
+    return found
+
+
+def running_games():
+    """{app ID: reaper PID} for every game Steam has running.
+
+    Steam runs every game under a "reaper SteamLaunch AppId=<id>" process, so
+    that process and everything below it make up the game. Non-Steam games use
+    their 32-bit shortcut ID here.
+    """
+    games = {}
+    for entry in os.listdir("/proc"):
+        if not entry.isdigit():
+            continue
+        try:
+            args = Path(f"/proc/{entry}/cmdline").read_bytes().split(b"\0")
+        except OSError:
+            continue
+        if len(args) < 3 or os.path.basename(args[0]) != b"reaper":
+            continue
+        for arg in args:
+            if arg.startswith(b"AppId="):
+                try:
+                    games[int(arg[6:])] = int(entry)
+                except ValueError:
+                    pass
+    return games
+
+
+def _game_tree(reaper):
+    pids, queue = [], [reaper]
+    while queue:
+        pid = queue.pop()
+        pids.append(pid)
+        queue += _children(pid)
+    return pids
+
+
+STOP_WAIT = 10  # Seconds a game has to close after SIGTERM before it is killed.
+
+
+def _start_time(pid):
+    """The process's start time, or None once it has ended (zombies included)."""
+    try:
+        # The fields after the command name, which can hold spaces and brackets.
+        fields = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()
+    except (OSError, IndexError):
+        return None
+    return None if fields[0] == "Z" else fields[19]
+
+
+def _signal_all(pids, sig):
+    for pid in reversed(pids):
+        try:
+            os.kill(pid, sig)
+        except OSError:
+            pass
+
+
+def stop_game(appid):
+    """End a game Steam started, as Steam's own Stop does. Blocking."""
+    reaper = running_games().get(appid)
+    if reaper is None:
+        return
+    # Start times tell a process that is still running from a new one given the same PID.
+    started = {pid: _start_time(pid) for pid in _game_tree(reaper)}
+    _signal_all(list(started), signal.SIGTERM)
+    deadline = time.monotonic() + STOP_WAIT
+    while True:
+        left = [pid for pid, start in started.items() if start is not None and _start_time(pid) == start]
+        if not left or time.monotonic() >= deadline:
+            break
+        time.sleep(0.25)
+    _signal_all(left, signal.SIGKILL)
