@@ -517,17 +517,19 @@ class GameDetailsPage(Adw.NavigationPage):
 
     def _edit_launch_options(self):
         editor = LaunchOptionsEditor(
-            self.window, self.launch_options, game_name=self.game.props.name, warnings_appid=self.game.props.appid
+            self.window, self.launch_options, game_name=self.game.props.name, appid=self.game.props.appid
         )
         editor.connect("done", self._on_launch_options_chosen)
         editor.connect("closed", lambda *_: self._show_warnings())  # Warnings may have been ignored.
         editor.present(self.window)
 
     def _on_launch_options_chosen(self, _editor, options):
-        # Shown here only; Apply saves it to Steam with any other change.
+        # The editor has saved them to Steam, or queued them for when it closes.
         self.launch_options = options
+        self.loaded["launch_options"] = options.strip()
         self._show_launch_options()
         self._on_settings_edited()
+        self._update_settings_description()
 
     def _update_settings_description(self):
         if pending.get(self.game.props.appid):

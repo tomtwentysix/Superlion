@@ -90,22 +90,20 @@ def ask_preset_name(parent, options, game_name, callback):
 
 
 class LaunchOptionsEditor(Adw.Dialog):
-    """Edits launch options for a game (game_name) or a preset (preset, or new_preset for a new one).
+    """Edits launch options for a game (appid and game_name) or a preset (preset, or new_preset for a new one).
 
-    For a game, emits "done" with the launch options when Done is pressed. For a
-    preset, saves it and emits "done" with its launch options.
+    Save writes a game's launch options to Steam, relaunching Steam or queueing
+    them if it is running, or saves the preset, then emits "done" with them.
     """
 
     __gsignals__ = {"done": (GObject.SignalFlags.RUN_FIRST, None, (str,))}
 
     def __init__(
-        self, window, options="", game_name="", preset=None, new_preset=False, appid=None, warnings_appid=None
+        self, window, options="", game_name="", preset=None, new_preset=False, appid=None
     ):
         self.window = window
         self.game_name = game_name
-        self.appid = appid  # When set, Save writes the launch options to Steam for this game.
-        # The game whose warnings can be ignored here.
-        self.warnings_appid = warnings_appid if warnings_appid is not None else appid
+        self.appid = appid  # Save writes the launch options to Steam for this game; None for a preset.
         self.preset = preset
         self.for_preset = preset is not None or new_preset
         if self.for_preset:
@@ -135,7 +133,7 @@ class LaunchOptionsEditor(Adw.Dialog):
 
         cancel = Gtk.Button(label="Cancel")
         cancel.connect("clicked", lambda *_: self.close())
-        self.done_button = Gtk.Button(label="Save" if self.for_preset or appid is not None else "Done")
+        self.done_button = Gtk.Button(label="Save")
         self.done_button.add_css_class("suggested-action")
         self.done_button.connect("clicked", lambda *_: self._on_done())
         add = Gtk.Button(icon_name="list-add-symbolic", tooltip_text="Add Custom Setting")
@@ -322,7 +320,7 @@ class LaunchOptionsEditor(Adw.Dialog):
             self.warning_group.remove(row)
         self.warning_rows = []
         found = lo.warnings(self.text())
-        ignored = lo.ignored_warnings().get(self.warnings_appid, set()) if self.warnings_appid is not None else set()
+        ignored = lo.ignored_warnings().get(self.appid, set()) if self.appid is not None else set()
         for icon in self.warning_icons.values():
             icon.set_visible(False)
         for warning in found:
@@ -331,7 +329,7 @@ class LaunchOptionsEditor(Adw.Dialog):
             row = warning_row(
                 setting.title, warning, is_ignored,
                 lambda remove, w=warning: self._fix(w, remove),
-                (lambda ignore, w=warning: self._ignore(w, ignore)) if self.warnings_appid is not None else None,
+                (lambda ignore, w=warning: self._ignore(w, ignore)) if self.appid is not None else None,
             )
             target = self.rows.get(warning.key)
             if target:
@@ -351,7 +349,7 @@ class LaunchOptionsEditor(Adw.Dialog):
         self._read_text(options)
 
     def _ignore(self, warning, ignore):
-        lo.set_ignored(self.warnings_appid, warning, ignore)
+        lo.set_ignored(self.appid, warning, ignore)
         self._update_warnings()
 
     def _subtitle(self, setting):
@@ -529,7 +527,7 @@ class LaunchOptionsEditor(Adw.Dialog):
                 launch_presets.update(self.preset.id, name, options)
             else:
                 launch_presets.add(name, options)
-        elif self.appid is not None:
+        else:
             def saved(_changes):
                 self.emit("done", options)
                 self.close()
