@@ -1,5 +1,5 @@
 Name:           superlion
-Version:        0.9.9
+Version:        0.9.10
 Release:        1%{?dist}
 Summary:        Native GNOME front end for your Steam library
 License:        GPL-3.0-or-later
@@ -65,6 +65,10 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/uk.co.solarflareit.Su
 %{_datadir}/dnf5/repos.override.d/50-superlion.repo
 
 %changelog
+* Tue Nov 03 2026 Tom <tom@solarflareit.co.uk> - 0.9.10-1
+- Show when a game is running: Play on its page reads Running and becomes Stop, which ends the game as Steam's own Stop does.
+- Fix the cart count in the Store sidebar and the cart page when the cart has items.
+
 * Sun Oct 25 2026 Tom <tom@solarflareit.co.uk> - 0.9.9-1
 - Save launch options edited on a game's page straight to Steam, as everywhere else, instead of waiting for the page's Apply button.
 
