@@ -4,31 +4,31 @@
 
 # Superlion
 
-Superlion is a native Linux app for your Steam library, built with GTK 4 and libadwaita. It shows the games you have installed and the ones you own, lets you browse the store, manage launch options, Proton builds and artwork, and stream games through Sunshine, all without opening Steam's own window. It suits anyone who would rather their games looked and behaved like the rest of their desktop.
+Superlion is a native Linux app for your Steam library, built with GTK 4 and libadwaita. It shows the games you've installed and the ones you own, and lets you browse the store, sort out launch options, Proton builds and artwork, and stream games through Sunshine, all without opening Steam's own window. If you'd rather your games looked and behaved like the rest of your desktop, it's for you.
 
 ## What it does
 
-The library brings together installed games from every Steam library folder and non-Steam games you have added to Steam. Once your Steam account is connected, it also shows the games you own but have not installed, which you can install into the library folder of your choice. You can filter by Steam's collections and your own, search by name, initials or app ID, and sort or group by name, size, last played, release date or genre. Each game has a page with its trailers, screenshots, description and developer updates from the store, along with its install details, launch options and compatibility tool. While a game is running, its Play button becomes Stop.
+The library pulls together installed games from all your Steam library folders, plus any non-Steam games you've added. Connect your Steam account and you'll also see the games you own but haven't installed, ready to install into whichever library folder you like. You can filter by Steam's collections or your own, search by name, initials or app ID, and sort or group by name, size, last played, release date or genre. Every game gets a page with its trailers, screenshots, description and developer updates from the store, as well as its install details, launch options and compatibility tool. While a game's running, its Play button turns into Stop.
 
-Non-Steam games can be added straight from Files, renamed with suggestions from the store, and matched to a store game so that they get its store page, news and artwork. Artwork for any game can be chosen from a file or from [SteamGridDB](https://www.steamgriddb.com) inside the app. Linux applications can be added as mod managers and linked to games, which then gain a **Launch Mod Manager** button.
+You can add non-Steam games straight from Files, rename them with suggestions from the store, and match them to a store game so they pick up its store page, news and artwork. Artwork for any game can come from a file or from [SteamGridDB](https://www.steamgriddb.com), right inside the app. Linux apps can be set up as mod managers and linked to games, which then get a **Launch Mod Manager** button.
 
-The launch options editor lets you type options directly or switch over 100 common settings on and off, and it warns about settings that are unnecessary, cause problems or conflict with one another. Presets and custom settings are kept in Preferences, where settings can also be applied to every installed game at once.
+The launch options editor lets you type options in yourself or flick over 100 common settings on and off, and it'll warn you about settings that aren't needed, cause problems or clash with each other. Presets and custom settings live in Preferences, where you can also apply a setting to every installed game in one go.
 
-The Downloads section follows Steam's active, paused and waiting downloads, and games show their progress and any available update on their covers. The store can be browsed natively, with prices in your Steam profile's country, and your wishlist and cart can be managed without opening a web page; checkout uses Steam's own pages inside the app.
+Downloads keeps track of what Steam's downloading, paused or queued, and game covers show their progress and any waiting update. The store is native too, with prices in your Steam profile's country, and you can manage your wishlist and cart without opening a web page. Checkout uses Steam's own pages inside the app.
 
-Preferences can also install and update [GE-Proton](https://github.com/GloriousEggroll/proton-ge-custom) and [Proton-CachyOS](https://github.com/CachyOS/proton-cachyos), checking each download against its published checksum before unpacking it.
+Preferences can also install and update [GE-Proton](https://github.com/GloriousEggroll/proton-ge-custom) and [Proton-CachyOS](https://github.com/CachyOS/proton-cachyos), checking each download against its published checksum before it's unpacked.
 
-Playing, installing and streaming start Steam hidden when it is needed, and Steam can optionally be kept running in the background from when Superlion opens.
+Steam starts quietly in the background when it's needed to play, install or stream, and you can have it start as soon as Superlion opens if you'd prefer.
 
 ## Streaming with Sunshine
 
-**Add to Sunshine** in a game's menu lists it in [Sunshine](https://github.com/LizardByte/Sunshine) so that Moonlight can start it. HDR streaming needs Sunshine from [LizardByte's COPR](https://copr.fedorainfracloud.org/coprs/lizardbyte/stable/) rather than the Flatpak or AppImage.
+**Add to Sunshine** in a game's menu adds it to [Sunshine](https://github.com/LizardByte/Sunshine) so you can start it from Moonlight. For HDR, you'll need Sunshine from [LizardByte's COPR](https://copr.fedorainfracloud.org/coprs/lizardbyte/stable/) rather than the Flatpak or AppImage.
 
-During a stream, Superlion switches the chosen display to the client's resolution, refresh rate and dynamic range, and puts everything back when the stream ends. Streams can use the main monitor, with the others turned off, or a dummy plug, which leaves your own monitors untouched. A dummy plug can be made to act as a 4K, 1440p or 1080p HDR display; this installs an EDID file in `/usr/lib/firmware/edid/` and adds the `drm.edid_firmware` boot option, so it asks for your password. Superlion can also quit EasyEffects for surround sound and hide the dock and notifications while streaming.
+While you're streaming, Superlion switches the chosen display to match the client's resolution, refresh rate and dynamic range, then puts everything back afterwards. You can stream from your main monitor, with the others switched off, or from a dummy plug, which leaves your own monitors alone. A dummy plug can be made to act as a 4K, 1440p or 1080p HDR display. That installs an EDID file in `/usr/lib/firmware/edid/` and adds the `drm.edid_firmware` boot option, so you'll be asked for your password. Superlion can also quit EasyEffects for surround sound and hide the dock and notifications during a stream.
 
 ## Installing
 
-On Fedora, install from [COPR](https://copr.fedorainfracloud.org/coprs/solartw/superlion/):
+On Fedora, install it from [COPR](https://copr.fedorainfracloud.org/coprs/solartw/superlion/):
 
 ```bash
 sudo dnf copr enable solartw/superlion
@@ -37,28 +37,28 @@ sudo dnf install superlion
 
 Store trailers need an H.264 decoder, such as `gstreamer1-plugin-libav` or `gstreamer1-plugin-openh264`.
 
-To build the RPM yourself, run `packaging/build-rpm.sh`, which writes it to `dist/`.
+To build the RPM yourself, run `packaging/build-rpm.sh` and you'll find it in `dist/`.
 
 ## Setup
 
-The first launch opens a setup wizard that finds your Steam installation, account and library folders. It also offers to connect your Steam account using your own Steam Web API key, which Valve provides free to every account, and SteamGridDB using a free API key. Both keys are kept in your system keyring. If your profile's game details are private, the list of owned games is read through the Steam store sign-in instead. Everything the wizard sets can be changed later in Preferences.
+The first time you open Superlion, a setup wizard finds your Steam installation, account and library folders. It'll also offer to connect your Steam account with your own Steam Web API key, which Valve gives every account for free, and SteamGridDB with a free API key. Both keys are kept in your system keyring. If your profile's game details are private, your owned games are read through the Steam store sign-in instead. You can change anything the wizard sets later in Preferences.
 
 ## How changes reach Steam
 
-Steam keeps several of its files in memory and overwrites them when it exits, so Superlion only writes to them while Steam is closed. If Steam is running, changes wait until it exits, and a banner offers to relaunch Steam to apply them straight away. Each file is backed up to `<file>.superlion-bak-<date>-<time>` before it is written.
+Steam keeps some of its files in memory and overwrites them when it quits, so Superlion only writes to them while Steam's closed. If Steam's running, your changes wait until it quits, and a banner offers to restart Steam so they're applied straight away. Every file is backed up to `<file>.superlion-bak-<date>-<time>` before it's written.
 
 | Change | Steam file |
 |---|---|
 | Launch options | `userdata/<account>/config/localconfig.vdf` (non-Steam games: `shortcuts.vdf`) |
 | Compatibility tool | `config/config.vdf` |
 | Non-Steam game names | `userdata/<account>/config/shortcuts.vdf` |
-| Collections, Favorites and Hidden | `userdata/<account>/config/cloudstorage/cloud-storage-namespace-1.json` |
+| Collections, Favourites and Hidden | `userdata/<account>/config/cloudstorage/cloud-storage-namespace-1.json` |
 
-Custom artwork goes straight into `userdata/<account>/config/grid`, which Steam does not hold in memory. Games added to Sunshine go into `~/.config/sunshine/apps.json`, and Sunshine is restarted to read them unless a game is streaming.
+Custom artwork goes straight into `userdata/<account>/config/grid`, which Steam doesn't hold in memory. Games added to Sunshine go into `~/.config/sunshine/apps.json`, and Sunshine's restarted to pick them up, unless a game's streaming.
 
 ## Privacy
 
-Superlion only talks to Valve and SteamGridDB. API keys are kept in your system keyring, and account data is cached in `~/.cache/superlion/`.
+Superlion only talks to Valve and SteamGridDB. API keys stay in your system keyring, and account data is cached in `~/.cache/superlion/`.
 
 ## Files
 
@@ -75,4 +75,4 @@ Superlion only talks to Valve and SteamGridDB. API keys are kept in your system 
 
 ## The name
 
-Superlion is named after the Fowler B6 Super Lion steam road locomotive, and is dedicated to the memory of John Wharton (1953–2026).
+Superlion is named after the Fowler B6 Super Lion traction engine, and is dedicated to the memory of John Wharton (1953–2026).

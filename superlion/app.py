@@ -81,7 +81,7 @@ class SuperlionApplication(Adw.Application):
             version=VERSION,
             comments=(
                 "A native Linux app for your Steam library. "
-                "Named after the Fowler B6 Super Lion steam road locomotive. Its icon shows the "
+                "Named after the Fowler B6 Super Lion traction engine. Its icon shows the "
                 "flywheel of Supreme of S J Wharton Ltd in Witney.\n\n"
                 f"{DEDICATION}\n{TRIBUTE}\n{KNOWN_FOR}"
             ),
