@@ -1,4 +1,6 @@
-<img src="data/icons/hicolor/scalable/apps/uk.co.solarflareit.Superlion.svg" width="128" alt="" align="right">
+<p align="center">
+  <img src="data/icons/hicolor/scalable/apps/uk.co.solarflareit.Superlion.svg" width="128" alt="">
+</p>
 
 # Superlion
 
