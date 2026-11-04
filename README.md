@@ -6,19 +6,27 @@
 
 Superlion is a native Linux app for your Steam library, built with GTK 4 and libadwaita. It shows the games you've installed and the ones you own, and lets you browse the store, sort out launch options, Proton builds and artwork, and stream games through Sunshine, all without opening Steam's own window. If you'd rather your games looked and behaved like the rest of your desktop, it's for you.
 
+![The library](screenshots/library.png)
+
 ## What it does
 
-The library pulls together installed games from all your Steam library folders, plus any non-Steam games you've added. Connect your Steam account and you'll also see the games you own but haven't installed, ready to install into whichever library folder you like. You can filter by Steam's collections or your own, search by name, initials or app ID, and sort or group by name, size, last played, release date or genre. Every game gets a page with its trailers, screenshots, description and developer updates from the store, as well as its install details, launch options and compatibility tool. While a game's running, its Play button turns into Stop.
+- **Your whole library in one place**: installed games, games you own but haven't installed, and non-Steam games.
+- **Find things quickly**: filter by Steam's collections or your own, search by name, initials or app ID, and sort or group by size, last played, release date or genre.
+- **A page for every game**: trailers, screenshots, news and install details. Play turns into Stop while it's running.
+- **Launch options without the guesswork**: switch over 100 common settings on and off, with warnings for ones that clash or do nothing.
+- **Proton builds**: install and update GE-Proton and Proton-CachyOS from Preferences.
+- **The Steam store, natively**: browse with local prices, and manage your wishlist and cart.
+- **Downloads**: see what Steam's downloading, with progress on each game's cover.
+- **Non-Steam games**: add them from Files and match them to a store game for its artwork and news. Artwork can also come from [SteamGridDB](https://www.steamgriddb.com).
+- **Mod managers**: link one to a game and launch it from the game's page.
+- **Streaming**: send games to Moonlight through Sunshine.
 
-You can add non-Steam games straight from Files, rename them with suggestions from the store, and match them to a store game so they pick up its store page, news and artwork. Artwork for any game can come from a file or from [SteamGridDB](https://www.steamgriddb.com), right inside the app. Linux apps can be set up as mod managers and linked to games, which then get a **Launch Mod Manager** button.
+## Screenshots
 
-The launch options editor lets you type options in yourself or flick over 100 common settings on and off, and it'll warn you about settings that aren't needed, cause problems or clash with each other. Presets and custom settings live in Preferences, where you can also apply a setting to every installed game in one go.
-
-Downloads keeps track of what Steam's downloading, paused or queued, and game covers show their progress and any waiting update. The store is native too, with prices in your Steam profile's country, and you can manage your wishlist and cart without opening a web page. Checkout uses Steam's own pages inside the app.
-
-Preferences can also install and update [GE-Proton](https://github.com/GloriousEggroll/proton-ge-custom) and [Proton-CachyOS](https://github.com/CachyOS/proton-cachyos), checking each download against its published checksum before it's unpacked.
-
-Steam starts quietly in the background when it's needed to play, install or stream, and you can have it start as soon as Superlion opens if you'd prefer.
+| | |
+|---|---|
+| ![A game's page](screenshots/game-overview.png) | ![The launch options editor](screenshots/launch-options.png) |
+| ![The store](screenshots/store.png) | ![Downloads](screenshots/downloads.png) |
 
 ## Streaming with Sunshine
 
