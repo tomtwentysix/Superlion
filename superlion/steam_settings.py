@@ -59,21 +59,19 @@ def read_compat_tool(config, appid):
 
 
 def list_compat_tools(config):
-    """Compatibility tools the user can choose, starting with Steam's default."""
     tools = [CompatTool("", "Default (Steam Setting)")]
     seen = {""}
 
-    custom_dirs = [config.root / "compatibilitytools.d"]
-    for base in custom_dirs:
-        for manifest in sorted(base.glob("*/compatibilitytool.vdf")) + sorted(base.glob("*.vdf")):
-            try:
-                entries = vdf.get_path(vdf.load(manifest), "compatibilitytools", "compat_tools") or {}
-            except OSError:
-                continue
-            for name, info in entries.items():
-                if name not in seen and isinstance(info, dict):
-                    seen.add(name)
-                    tools.append(CompatTool(name, info.get("display_name", name)))
+    base = config.root / "compatibilitytools.d"
+    for manifest in sorted(base.glob("*/compatibilitytool.vdf")) + sorted(base.glob("*.vdf")):
+        try:
+            entries = vdf.get_path(vdf.load(manifest), "compatibilitytools", "compat_tools") or {}
+        except OSError:
+            continue
+        for name, info in entries.items():
+            if name not in seen and isinstance(info, dict):
+                seen.add(name)
+                tools.append(CompatTool(name, info.get("display_name", name)))
 
     for folder in config.library_folders():
         steamapps = Path(folder) / "steamapps"
@@ -115,10 +113,7 @@ def _write_atomic(path, data, binary=False):
 
 
 def write_changes(config, changes):
-    """Apply {appid: {"launch_options"?, "compat_tool"?, "name"?}} to Steam's files.
-
-    "name" applies to non-Steam games only, whose names Steam keeps in shortcuts.vdf.
-    """
+    """Apply {appid: {"launch_options"?, "compat_tool"?, "name"?, "shortcut"?}}; "name" is for non-Steam games only."""
     if config_mod.SCREENSHOTS:
         return
     launch = {a: c["launch_options"] for a, c in changes.items() if "launch_options" in c}

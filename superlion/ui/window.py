@@ -32,7 +32,6 @@ headerbar.hero-header button { color: white; }
 headerbar.hero-header.start-light button.hero-back,
 headerbar.hero-header.start-light windowcontrols.start button,
 headerbar.hero-header.end-light windowcontrols.end button { color: rgba(0, 0, 0, 0.8); }
-/* Menu items built from buttons use the normal weight of standard menu items. */
 """
 
 
@@ -206,7 +205,6 @@ class SuperlionWindow(Adw.ApplicationWindow):
             header.pack_start(button)
         sidebar_breakpoint = Adw.Breakpoint.new(Adw.BreakpointCondition.parse("max-width: 760sp"))
         sidebar_breakpoint.add_setter(self.split, "collapsed", True)
-        # Narrow windows start with the sidebar folded away; wide ones always show it.
         sidebar_breakpoint.connect("apply", lambda *_: self._show_sidebar(False))
         sidebar_breakpoint.connect("unapply", lambda *_: self._restore_sidebar())
         self.add_breakpoint(sidebar_breakpoint)
@@ -234,11 +232,10 @@ class SuperlionWindow(Adw.ApplicationWindow):
         return Adw.NavigationPage(child=self.split, title="Superlion", tag="main")
 
     def _restore_sidebar(self):
-        """Return the sidebar to the user's choice on wide windows, unless Downloads is open."""
         self._show_sidebar(self._sidebar_wanted and self.view_stack.get_visible_child_name() != "downloads")
 
     def _show_sidebar(self, show):
-        """Show or hide the sidebar without recording it as the user's choice."""
+        # Not recorded as the user's choice.
         self._sidebar_changing = True
         self.split.set_show_sidebar(show)
         self._sidebar_changing = False
@@ -358,12 +355,7 @@ class SuperlionWindow(Adw.ApplicationWindow):
         self.store_view.sort_genres(games)
 
     def _match_shortcuts(self, shortcuts):
-        """Link non-Steam games to the same game on the Steam store, where there is one.
-
-        A matched game gets that store entry's metadata, missing artwork, store
-        page and news, so it looks like a Steam game in the library. Nothing is
-        written to Steam, and custom artwork always takes priority.
-        """
+        # Nothing is written to Steam, and custom artwork always takes priority.
         if not shortcuts:
             return
         region = self.store_region
@@ -428,12 +420,6 @@ class SuperlionWindow(Adw.ApplicationWindow):
         self.toast("Match removed" if not steam_appid else "Matched to the Steam store")
 
     def _use_steam_artwork(self, game, steam_appid):
-        """Save the matched Steam game's original artwork as this game's artwork.
-
-        Kinds with no custom image are filled straight away. If some already have
-        custom images, the user chooses whether Steam's should replace them.
-        """
-
         def download():
             return {kind: owned.download_steam_art(steam_appid, kind) for kind in library.ART_LABELS}
 
@@ -489,7 +475,7 @@ class SuperlionWindow(Adw.ApplicationWindow):
                 owned.ensure_art(game, kind, source_appid=steam_appid)
 
     def _refresh_owned(self):
-        """Update owned games with the Web API key, or the store's list if that is empty."""
+        # Falls back to the store's list when the Web API returns nothing.
         key, steamid = self.api_key, auth.steamid64(self.config)
 
         def done(entries, error):
@@ -538,7 +524,6 @@ class SuperlionWindow(Adw.ApplicationWindow):
 
     @property
     def store_region(self):
-        """Country for store prices: the chosen one, else the account's, else the UK."""
         if self.config is not None and not self.config.region_auto and self.config.region:
             return self.config.region
         return self.account_country or "GB"
@@ -577,7 +562,7 @@ class SuperlionWindow(Adw.ApplicationWindow):
         self.reload()
 
     def sign_out(self):
-        """Forget the Web API key and owned games; the Steam website sign-in is separate."""
+        # The Steam website sign-in is separate and stays.
         auth.clear_key()
         owned.clear_cache()
         self.api_key = ""
@@ -601,7 +586,6 @@ class SuperlionWindow(Adw.ApplicationWindow):
         self._collections_changed()
 
     def rename_game(self, game):
-
         def rename(name, steam_appid):
             game.props.name = name
             pending.add(game.props.appid, {"name": name})
@@ -636,11 +620,7 @@ class SuperlionWindow(Adw.ApplicationWindow):
         self._collections_changed()
 
     def queue_steam_sync(self):
-        """Write edits to Steam's collections now if Steam is closed, otherwise when it closes.
-
-        Unlike the Sync button, this never sends Superlion's own collections, and it
-        does not interrupt with a dialog: the pending changes banner offers a relaunch.
-        """
+        # Unlike sync_collections, this never sends Superlion's own collections and never asks.
         pending.add_collections_sync(include_own=False)
         if steam_control.is_running(self.config):
             self.update_pending()
@@ -674,7 +654,6 @@ class SuperlionWindow(Adw.ApplicationWindow):
         entry.select_region(0, -1)
 
     def new_collection(self, game=None):
-
         def create(name):
             collection = game_collections.create(name)
             if game is not None:
@@ -735,7 +714,6 @@ class SuperlionWindow(Adw.ApplicationWindow):
         dialog.present(self)
 
     def sync_collections(self):
-        """Copy Superlion's collections into Steam, which must be closed to accept them."""
         if not steam_control.is_running(self.config):
             try:
                 pending.add_collections_sync()
@@ -851,7 +829,6 @@ class SuperlionWindow(Adw.ApplicationWindow):
             self.toast(f"{library.ART_LABELS[kind]} updated")
 
     def launch_mod_manager(self, manager):
-        """Start a mod manager: a Linux application directly, a non-Steam game through Steam."""
         if manager.is_app:
             app = mod_managers.app_info(manager)
             if app is None:
@@ -954,17 +931,11 @@ class SuperlionWindow(Adw.ApplicationWindow):
         self.update_pending()
 
     def apply_game_settings(self, appid, changes, on_applied=None, parent=None):
-        """Save a game's settings to Steam, asking first when Steam must be closed.
-
-        on_applied(changes) runs once they are saved or queued for when Steam closes.
-        """
+        # on_applied(changes) runs once they are saved or queued for when Steam closes.
         self.apply_settings({appid: changes}, on_applied and (lambda: on_applied(changes)), parent)
 
     def apply_settings(self, changes, on_applied=None, parent=None, reload=False):
-        """Save {app ID: settings} to Steam, as apply_game_settings does for one game.
-
-        reload re-reads the library once they are written, for changes that add games.
-        """
+        # changes is {appid: settings}; reload is for changes that add games.
         def queue():
             # Queue first so older queued values for these games cannot overwrite these.
             for appid, game_changes in changes.items():
@@ -1019,7 +990,6 @@ class SuperlionWindow(Adw.ApplicationWindow):
         install_game(self, appid, name)
 
     def relaunch_steam(self, reload=False):
-        """Close Steam, write waiting changes, and start it again; reload re-reads the library."""
         if self._relaunching:
             return
         self._relaunching = True

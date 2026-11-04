@@ -128,6 +128,7 @@ class TrailerTile(Gtk.Overlay):
 
 
 _gst_ready = None
+Gst = None
 
 
 def _init_gstreamer():
@@ -146,11 +147,7 @@ def _init_gstreamer():
     return _gst_ready
 
 
-Gst = None
-
-
 class MediaCarousel(Gtk.Box):
-
     def __init__(self, data):
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         self.carousel = Adw.Carousel(allow_scroll_wheel=False, spacing=12)

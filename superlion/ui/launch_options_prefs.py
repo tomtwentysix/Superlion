@@ -12,7 +12,6 @@ PAGE_NAME = "launch-options"
 
 
 def _options_row(title, options, on_activate):
-    """A row naming the settings in some launch options in full; it opens them in the editor."""
     row = Adw.ActionRow(
         title=GLib.markup_escape_text(title),
         subtitle=GLib.markup_escape_text(lo.summary(options)),
@@ -60,8 +59,8 @@ class LaunchOptionsPage(Adw.PreferencesPage):
         ]
         for group in self.groups:
             self.add(group)
-        if self.unnamed - self.looked_up:
-            missing = self.unnamed - self.looked_up
+        missing = self.unnamed - self.looked_up
+        if missing:
             self.looked_up |= missing
             auth.run_async(lambda: game_names.look_up(sorted(missing)), lambda *_: self.refresh())
 
@@ -256,7 +255,6 @@ class LaunchOptionsPage(Adw.PreferencesPage):
             self.open_categories.discard(category)
 
     def _global_row(self, setting, problems, ignored):
-        """A setting's row, with any warnings about it across games and a menu for all games."""
         parts = [setting.key if setting.kind == lo.ENV and setting.title != setting.key else "",
                  f"Used in {setting.games} game{'s' if setting.games != 1 else ''}" if setting.games
                  else "Not used in your games yet"]
@@ -297,7 +295,7 @@ class LaunchOptionsPage(Adw.PreferencesPage):
         return row
 
     def _confirm_fix(self, setting, fix, problems, remove=False):
-        """Apply each game's own fix for its warnings about the setting, in the games not ignoring them."""
+        # problems are [(app ID, launch options, warning)], already without ignored ones.
         changes = {}
         for appid, options, warning in problems:
             current = changes.get(appid, {}).get("launch_options", options)

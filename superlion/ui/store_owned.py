@@ -1,14 +1,8 @@
 """Owned and family-shared games from the Steam store's own session.
 
-When the Web API returns no games, Superlion reads the list the Steam store
-keeps for the signed-in browser (the one it uses to mark games "In Library").
-It is loaded in Superlion's own browser view, which shares the sign-in made on
-Steam's own pages, and only the page text is read. This is not documented by
-Valve, so it is used only as a fallback.
-
-Family library games are never in either owned list. IFamilyGroupsService does
-not accept a Web API key, so the store session's own access token is read from
-the same browser view and used only for that request; it is never stored.
+The store's userdata list is undocumented, so it is only a fallback for when
+the Web API returns no games. IFamilyGroupsService does not accept a Web API
+key, so the store session's access token is used for it, and never stored.
 """
 
 import json
@@ -132,7 +126,7 @@ def fetch_family_entries(steamid, callback):
         return shared_entries(library.get("apps", []), steamid)
 
     def on_token(data):
-        token = (data or {}).get("data", {}).get("webapi_token") if isinstance(data, dict) else None
+        token = data.get("data", {}).get("webapi_token") if isinstance(data, dict) else None
         if not token:
             callback(None)  # Not signed in to the Steam store here.
             return

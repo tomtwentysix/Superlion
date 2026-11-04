@@ -1,11 +1,7 @@
-"""Splitting launch options into separate settings, and joining them back.
+"""Splits Steam launch options into settings and joins them back.
 
-Steam launch options take the form
-
-    VARIABLE=value … wrapper programs … %command% game arguments …
-
-Each part becomes a setting that the launch options editor can switch on and
-off. Anything not recognised is kept as written, so nothing is lost.
+Launch options take the form VARIABLE=value … wrapper programs … %command% game
+arguments …. Words not recognised are kept as written.
 """
 
 import json
@@ -518,7 +514,6 @@ def remove_custom(kind, key):
 
 
 def is_valid_key(kind, key):
-    """Whether a name can be used for a setting of this kind."""
     if kind == ENV:
         return bool(re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key))
     if kind == WRAPPER:
@@ -527,7 +522,7 @@ def is_valid_key(kind, key):
 
 
 def tokenize(options):
-    """Split on spaces outside quotes, keeping the quotes in each word."""
+    # Splits on spaces outside quotes, keeping the quotes in each word.
     words, current, quote = [], "", ""
     for char in options:
         if quote:
@@ -718,10 +713,7 @@ def warnings(options, custom=None):
             warn(key, BREAKS, f"conflict-{other}", f"Conflicts with {named(other_kind, other)}. {reason}", kind)
 
     if "LD_PRELOAD" in env and not env["LD_PRELOAD"].strip("\"'"):
-        warn(
-            "LD_PRELOAD", BREAKS, "overlay",
-            "Stops the Steam overlay and its screenshots.",
-        )
+        warn("LD_PRELOAD", BREAKS, "overlay", "Stops the Steam overlay and its screenshots.")
     if "PROTON_PREFER_SDL" in on:
         warn("PROTON_PREFER_SDL", BREAKS, "steam-input", "Controller layouts set in Steam Input are not used.")
     return found
@@ -730,7 +722,7 @@ def warnings(options, custom=None):
 def conflicts(parsed, on):
     """Pairs of settings that work against each other, as [((kind, key), (kind, key), reason)]."""
     gamescope = (WRAPPER, "gamescope")
-    gamescope_options = tokenize(parsed.wrappers.get("gamescope", "")) if "gamescope" in parsed.wrappers else None
+    gamescope_options = tokenize(parsed.wrappers["gamescope"]) if "gamescope" in parsed.wrappers else None
     found = []
     if gamescope_options is not None:
         if "PROTON_ENABLE_WAYLAND" in on and "--expose-wayland" not in gamescope_options:
@@ -759,14 +751,13 @@ def conflicts(parsed, on):
 
 
 def quote(value):
-    """The value as written in launch options, quoted if it needs to be."""
     if value[:1] in "\"'" or not NEEDS_QUOTES.search(value):
         return value
     return '"' + value.replace('"', '\\"') + '"'
 
 
 def compose(env, wrappers, other, arguments):
-    """Launch options from settings: env [(name, value)], wrappers {program: options}."""
+    # env is [(name, value)], wrappers {program: options}.
     words = [f"{name}={quote(value)}" for name, value in env]
     # Known programs first, then the user's own, which run closest to the game.
     for program in [p for p in WRAPPERS if p in wrappers] + [p for p in wrappers if p not in WRAPPERS]:
@@ -825,16 +816,11 @@ def setting_for(kind, key, custom=None):
 
 
 def suggestions(present):
-    """Settings Superlion knows that are not among the present (kind, key) pairs."""
     return [setting_for(kind, key, {}) for kind, key in CATALOGUE if (kind, key) not in present]
 
 
 def baseline(all_options):
-    """Every setting Superlion knows, used in the given launch options, or added by the user.
-
-    Returns {(kind, key): Setting}, counting how many games use each setting and
-    which values they use.
-    """
+    """{(kind, key): Setting} for every known, used or custom setting, with how many games use it and their values."""
     settings = {}
     custom = custom_settings()
     programs = custom_programs(custom)
@@ -859,7 +845,6 @@ def baseline(all_options):
 
 
 def custom_programs(custom=None):
-    """Names of programs the user added, for parse()."""
     custom = custom if custom is not None else custom_settings()
     return {key for kind, key in custom if kind == WRAPPER}
 
@@ -893,8 +878,7 @@ def fix_label(warning):
 
 
 def fix(options, warning, remove=False):
-    """The launch options with the warning's setting removed; a duplicate keeps its last value and an old name is
-    replaced, unless remove is set."""
+    """Removes the warning's setting; unless remove is set, a duplicate keeps its last value and an old name is renamed."""
     parsed = parse(options, custom_programs())
     kind, key = warning.key
     if kind == ENV:
@@ -915,13 +899,6 @@ def fix(options, warning, remove=False):
     return compose(parsed.env, parsed.wrappers, parsed.other, parsed.arguments)
 
 
-def has_setting(options, kind, key):
-    parsed = parse(options, custom_programs())
-    if kind == ENV:
-        return key in dict(parsed.env)
-    return key in (parsed.wrappers if kind == WRAPPER else parsed.arguments)
-
-
 def with_setting(options, kind, key, value="", on=True):
     """The launch options with a setting switched on (with this value) or off; unchanged if already so."""
     parsed = parse(options, custom_programs())
@@ -931,7 +908,7 @@ def with_setting(options, kind, key, value="", on=True):
             return options
         parsed.env = [(name, v) for name, v in parsed.env if name != key] + ([(key, value)] if on else [])
     elif kind == WRAPPER:
-        if (parsed.wrappers.get(key, None) == value) if on else key not in parsed.wrappers:
+        if (parsed.wrappers.get(key) == value) if on else key not in parsed.wrappers:
             return options
         parsed.wrappers.pop(key, None)
         if on:

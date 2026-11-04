@@ -1,4 +1,6 @@
-"""Parser and writer for Valve's text KeyValues format (.vdf and .acf files)."""
+"""Valve's KeyValues format: text (.vdf and .acf files) and binary."""
+
+import struct
 
 _UNESCAPE = {"n": "\n", "t": "\t", "\\": "\\", '"': '"'}
 # Steam writes newlines and tabs inside strings literally; only these are escaped.
@@ -38,7 +40,6 @@ def _tokenize(text):
 
 
 def loads(text):
-    """Parse KeyValues text into nested dictionaries of strings."""
     root = {}
     stack = [root]
     key = None
@@ -125,13 +126,7 @@ class Float32(float):
 
 
 def loads_binary(data):
-    """Parse Steam's binary KeyValues into nested dictionaries.
-
-    Strings become str, 32-bit integers int (read unsigned, as app IDs are),
-    and the rarer 64-bit and float values keep marker types for writing back.
-    """
-    import struct
-
+    """32-bit integers are read unsigned, as app IDs are; 64-bit and float values keep marker types."""
     pos = 0
 
     def read_cstring():
@@ -166,13 +161,10 @@ def loads_binary(data):
             else:
                 raise ValueError(f"Unknown binary KeyValues type {kind} at offset {pos - 1}")
 
-    root = read_map()
-    return root
+    return read_map()
 
 
 def dumps_binary(node):
-    import struct
-
     out = bytearray()
     for key, value in node.items():
         encoded_key = key.encode("utf-8", "surrogateescape") + b"\0"

@@ -42,12 +42,7 @@ def short_path(path):
 
 
 class Choice(GObject.Object):
-    """A drop-down of detected options that always ends with "Other…".
-
-    Choosing "Other…" reveals a row for a manual value: a folder picker when
-    kind is "folder", otherwise a text entry. validate(value) returns an error
-    message, or None when the value is acceptable.
-    """
+    # kind is "folder" or "text"; validate(value) returns an error message or None.
 
     __gsignals__ = {"changed": (GObject.SignalFlags.RUN_FIRST, None, ())}
 
@@ -159,7 +154,6 @@ class Choice(GObject.Object):
 
 
 def where(root):
-    """Where Steam's data is, in words, such as "Data in your home folder"."""
     if steam_paths.kind_for_root(root) == "flatpak":
         return "Data in the Flatpak's own folder"
     if str(root).startswith(str(Path.home()) + "/"):
@@ -168,7 +162,7 @@ def where(root):
 
 
 def install_choices(add_group, state):
-    """Steam Data Folder and Steam command choices, behind Change…; returns (folder, command)."""
+    # Returns the (folder, command) Choices.
     summary = Adw.PreferencesGroup(title="Steam Installation")
     add_group(summary)
     found = Adw.ActionRow()
@@ -244,10 +238,7 @@ def apply_install(state, folder, command):
 
 
 class AccountChoice(Choice):
-    """The Steam account picker. Until someone signs in to Steam there are no accounts,
-    so it explains that, offers to open Steam and watches for one; setup can carry on
-    without one meanwhile.
-    """
+    # Until someone signs in to Steam there are no accounts, so it watches for one.
 
     def __init__(self, group, state):
         self.root = state.steam_root
@@ -321,7 +312,7 @@ class AccountChoice(Choice):
 
     def _refresh(self):
         super()._refresh()
-        if hasattr(self, "empty") and not self.options:
+        if not self.options:
             self._show_empty()
 
 
@@ -362,7 +353,7 @@ def apply_account(state, account, region):
 
 
 def library_groups(add_group, state, get_parent):
-    """Library folder switches and extra folders; returns collect(state) to read them back."""
+    # Returns collect(state), which writes the choices into state.
     group = Adw.PreferencesGroup(
         title="Library Folders", description="Games in folders that are turned off are hidden."
     )

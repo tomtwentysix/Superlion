@@ -18,7 +18,6 @@ class AppChooser(Adw.Dialog):
         self.list = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
         self.list.add_css_class("boxed-list")
         self.list.set_filter_func(self._filter)
-        self.rows = []
         for app in mod_managers.installed_apps():
             row = Adw.ActionRow(
                 title=GLib.markup_escape_text(app.get_display_name()),

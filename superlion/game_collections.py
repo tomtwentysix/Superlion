@@ -44,11 +44,7 @@ def _modified_path(config):
 
 
 def load_steam(config):
-    """Steam's static collections, with Favorites first and Hidden last.
-
-    Dynamic collections are defined by filters that only Steam evaluates, so
-    they are left out.
-    """
+    # Dynamic collections are left out, as only Steam can evaluate their filters.
     try:
         entries = json.loads(_namespace_path(config).read_text())
     except (OSError, ValueError):
@@ -237,13 +233,7 @@ def _new_steam_id():
 
 
 def sync_to_steam(config, include_own=True):
-    """Write Superlion's collections into Steam's collection data. Steam must be closed.
-
-    Each collection becomes (or updates) a Steam collection with the same name
-    and games, and is listed as changed so Steam uploads it to Steam Cloud when
-    it next starts. Collections deleted in Superlion are marked deleted in Steam.
-    Both files are backed up first.
-    """
+    """Steam must be closed. Changed keys go in .modified.json so Steam uploads them to Steam Cloud."""
     if config_mod.SCREENSHOTS:
         return
     store = _load_store()

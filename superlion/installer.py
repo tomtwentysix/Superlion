@@ -23,7 +23,6 @@ class Library:
 
 
 def libraries(config):
-    """The enabled library folders, with the free space on each."""
     result = []
     for folder in config.library_folders():
         try:

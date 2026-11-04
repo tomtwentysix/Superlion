@@ -1,8 +1,10 @@
 """Matching non-Steam games to the same game on the Steam store, for its artwork."""
 
+import calendar
 import json
 import os
 import re
+import time
 
 from . import config as config_mod
 from . import library, store_api
@@ -35,11 +37,10 @@ def _save_cache(cache):
 
 
 def find_steam_appids(names, region):
-    """{name: Steam app ID or 0} for non-Steam game names. Blocking.
+    """{name: Steam app ID or 0}. Blocking.
 
-    Only exact name matches count (ignoring case, punctuation and ™), so a tool
-    such as a mod manager is never given an unrelated game's artwork. Results,
-    including misses, are remembered so each name is looked up once.
+    Only exact name matches count, so a tool such as a mod manager is never given
+    an unrelated game's artwork. Misses are cached too.
     """
     cache = _load_cache()
     changed = False
@@ -73,10 +74,7 @@ def load_overrides():
         return {}
 
 
-def set_override(shortcut_appid, steam_appid):
-    """Remember the user's choice; steam_appid 0 marks the game as not on Steam."""
-    overrides = load_overrides()
-    overrides[int(shortcut_appid)] = int(steam_appid)
+def _save_overrides(overrides):
     path = _overrides_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
@@ -84,13 +82,17 @@ def set_override(shortcut_appid, steam_appid):
     os.replace(tmp, path)
 
 
+def set_override(shortcut_appid, steam_appid):
+    """steam_appid 0 marks the game as not on Steam."""
+    overrides = load_overrides()
+    overrides[int(shortcut_appid)] = int(steam_appid)
+    _save_overrides(overrides)
+
+
 def clear_override(shortcut_appid):
     overrides = load_overrides()
     if overrides.pop(int(shortcut_appid), None) is not None:
-        path = _overrides_path()
-        tmp = path.with_suffix(".tmp")
-        tmp.write_text(json.dumps({str(k): v for k, v in overrides.items()}, indent=1))
-        os.replace(tmp, path)
+        _save_overrides(overrides)
 
 
 def match_games(games, region):
@@ -109,19 +111,13 @@ _VR_CATEGORIES = {31: 1, 53: 1, 54: 2}  # Store category IDs: VR Support, VR Sup
 
 
 def store_metadata(steam_appid, region):
-    """Release date, genres and VR support from a game's store page. Blocking.
-
-    Used for matched games that Steam's local app database does not know about.
-    """
-    import calendar
-    import time as time_mod
-
+    """For matched games missing from Steam's local app database. Blocking."""
     data = store_api.details(steam_appid, region) or {}
     release = 0
     date_text = (data.get("release_date") or {}).get("date", "")
     for fmt in _DATE_FORMATS:
         try:
-            release = calendar.timegm(time_mod.strptime(date_text, fmt))
+            release = calendar.timegm(time.strptime(date_text, fmt))
             break
         except ValueError:
             continue

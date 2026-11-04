@@ -64,7 +64,6 @@ def clear_cache():
 
 
 def to_games(config, owned, installed_ids):
-    """Game objects for owned games that are not installed."""
     games = []
     for entry in owned:
         appid = int(entry.get("appid", 0))
@@ -93,12 +92,9 @@ _lock = threading.Lock()
 
 
 def ensure_art(game, kind, source_appid=None):
-    """Download missing artwork for a game in the background.
+    """Fetch missing artwork in the background, as Steam only caches it for games shown recently.
 
-    Steam only caches artwork locally for games it has shown recently, so games
-    that are not installed often need their images from Steam's public servers.
-    source_appid fetches another app's artwork instead, used for non-Steam games
-    that match a game sold on Steam. The game's property is updated when ready.
+    source_appid takes another app's artwork, for non-Steam games matched to a store game.
     """
     if game.get_property(kind):
         return

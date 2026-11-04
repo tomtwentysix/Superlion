@@ -20,7 +20,6 @@ MANAGER_FREE_VIEWS = {"all", "installed", "not_installed", "non_steam"}
 
 
 class LibraryTile(Gtk.Box):
-
     def __init__(self, window):
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         self.window = window
@@ -134,11 +133,7 @@ class LibraryTile(Gtk.Box):
 
 
 def game_menu(window, game, page=None):
-    """A game's menu, and the "game" action group it uses.
-
-    The library's right-click menu and the ⋮ menu on a game's page (page) share
-    it. The page has its own Play and mod manager buttons, so those are left out there.
-    """
+    """(menu, "game" action group) for a library tile, or a game's page, which has its own Play and mod manager buttons."""
     actions = Gio.SimpleActionGroup()
     appid = game.props.appid
     installed = game.props.installed

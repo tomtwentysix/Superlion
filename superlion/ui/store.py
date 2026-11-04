@@ -1,4 +1,4 @@
-"""Native store: its sidebar, home, lists, genres, wishlist, cart and search, and store game pages."""
+"""Native store and store game pages."""
 
 import json
 
@@ -8,7 +8,7 @@ from .. import auth, steam_control, store_account, store_api
 from . import images
 from .library_view import SidebarRow
 from .media import MediaCarousel, description_widgets
-from .webview import CART_SCRIPT, STATE_SCRIPT, WISHLIST_SCRIPT, SteamWebPage, run_in_store
+from .webview import CART_SCRIPT, STATE_SCRIPT, WISHLIST_SCRIPT, run_in_store
 
 CATEGORIES = [
     ("specials", "Specials", "superlion-sale-symbolic"),
@@ -123,8 +123,6 @@ def _scroller(child):
 
 
 class StoreView(Gtk.Box):
-    """The Store section. Its sidebar is self.sidebar, which the window shows beside it."""
-
     def __init__(self, window):
         super().__init__(orientation=Gtk.Orientation.VERTICAL)
         self.window = window
@@ -233,7 +231,6 @@ class StoreView(Gtk.Box):
             self.rows["cart"].count.set_label(str(count) if count else "")
 
     def sort_genres(self, games):
-        """Put the genres most common among the user's games first."""
         counts = {genre: 0 for genre in self.genres}
         for game in games:
             for genre in game.props.genres or []:
@@ -279,7 +276,6 @@ class StoreView(Gtk.Box):
         alert.present(self.window)
 
     def set_after_hours(self, on):
-        """Switch the sidebar and views between the store and After Hours."""
         self.after_hours = on
         self.view = "after:featured" if on else "featured"
         self.search_entry.set_placeholder_text("Search After Hours" if on else "Search the store")
@@ -287,8 +283,7 @@ class StoreView(Gtk.Box):
         self.sidebar_list.select_row(self.rows[self.view])
 
     def load(self, force=False):
-        config = self.window.config
-        if config is None or (self.loaded_region == self.window.store_region and not force):
+        if self.window.config is None or (self.loaded_region == self.window.store_region and not force):
             return
         self.stack.set_visible_child_name("loading")
         region = self.window.store_region
@@ -366,7 +361,6 @@ class StoreView(Gtk.Box):
             self._show_grid(title, self.featured.get(self.view, []))
 
     def _show_sections(self, sections):
-        """Each section as a heading and a row of capsules, as on the store's home page."""
         while child := self.home.get_first_child():
             self.home.remove(child)
         for title, items in sections:
@@ -420,7 +414,6 @@ class StoreView(Gtk.Box):
         auth.run_async(work, done)
 
     def _show_after_hours(self):
-        """An After Hours view: its home and genres in sections like the store's, its lists as a grid."""
         serial, region, view = self._serial, self.window.store_region, self.view
         lists = {key: (title, options) for key, title, _icon, options in AFTER_HOURS_LISTS}
         self.stack.set_visible_child_name("loading")
@@ -556,7 +549,6 @@ class StoreView(Gtk.Box):
         self.stack.set_visible_child_name("wishlist")
 
     def show_cart(self):
-        """Open the Store at the cart."""
         if self.after_hours:
             self.set_after_hours(False)
         self.window.view_stack.set_visible_child_name("store")
@@ -761,7 +753,6 @@ class StoreView(Gtk.Box):
 
 
 class StoreAppPage(Adw.NavigationPage):
-
     def __init__(self, window, appid, name=""):
         super().__init__(title=name or "Store")
         self.window = window
@@ -806,11 +797,11 @@ class StoreAppPage(Adw.NavigationPage):
                 try:
                     summary = store_api.reviews(appid)
                 except Exception:  # The review summary is optional.
-                    summary = None
+                    pass
                 try:
                     options = store_api.purchase_options(appid, region)
                 except Exception:  # Buying falls back to Steam's page.
-                    options = []
+                    pass
             return data, summary, options
 
         def done(result, error):
@@ -922,7 +913,6 @@ class StoreAppPage(Adw.NavigationPage):
         return box
 
     def _options_popover(self, options):
-        """A menu of a game's editions and bundles, each with its price."""
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         popover = Gtk.Popover(child=box)
         popover.add_css_class("menu")
@@ -962,7 +952,3 @@ class StoreAppPage(Adw.NavigationPage):
             steam_control.open_uri(self.window.config, uri)
         except GLib.Error as error:
             self.window.toast(f"Steam could not be opened: {error.message}")
-
-
-def open_web(window, url, title):
-    window.nav.push(SteamWebPage(window, url, title))

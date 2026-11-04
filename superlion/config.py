@@ -1,5 +1,3 @@
-"""Persistent application configuration chosen in the setup wizard."""
-
 import json
 import os
 import shutil

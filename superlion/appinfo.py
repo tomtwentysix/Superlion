@@ -59,7 +59,7 @@ def _cache_path():
 
 
 def _parse(data):
-    """{appid: {"release": unix time or 0, "genres": [names]}} from appinfo.vdf bytes."""
+    """{appid: {"name", "type", "release", "vr", "genres", "installdir", "download_size", "builds"}}"""
     magic, _universe = struct.unpack_from("<II", data, 0)
     if magic == MAGIC_V29:
         (table_offset,) = struct.unpack_from("<q", data, 8)

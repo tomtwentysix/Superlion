@@ -1,10 +1,8 @@
 """Guided setup of the user's own Steam Web API key.
 
-The key page is Valve's own (steamcommunity.com/dev/apikey), shown inside
-Superlion. If the user is not signed in to the Steam website, Steam's own
-sign-in page appears there. Superlion fills in the domain field and reads the
-key from the page once it is shown; agreeing to Valve's terms, registering and
-any phone confirmation are left to the user.
+Valve's key page is shown inside Superlion, which fills in the domain field and
+reads the key once it appears; agreeing to the terms and registering are left
+to the user.
 """
 
 from urllib.parse import urlparse
@@ -244,7 +242,7 @@ class SteamKeySetup(Gtk.Box):
 
 
 class SteamKeyDialog(Adw.Dialog):
-    """The setup as a dialog, used from the main menu and Preferences; emits "signed-in"."""
+    """Emits "signed-in" once a key is stored."""
 
     __gsignals__ = {"signed-in": (GObject.SignalFlags.RUN_FIRST, None, ())}
 

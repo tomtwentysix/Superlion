@@ -138,7 +138,6 @@ class GameDetailsPage(Adw.NavigationPage):
         return overlay
 
     def _build_match_row(self):
-        """Which Steam store game this non-Steam game is shown as, with ways to change it."""
         game = self.game
         if game.props.store_appid:
             subtitle = f"Store page, news and artwork from Steam app {game.props.store_appid}"
@@ -185,7 +184,6 @@ class GameDetailsPage(Adw.NavigationPage):
                 self.header.remove_css_class(css)
 
     def _build_download_progress(self):
-        """Progress of a Steam update or install, shown below Play while there is one."""
         self.download_area = Gtk.Box(
             orientation=Gtk.Orientation.VERTICAL, spacing=6, visible=False, halign=Gtk.Align.CENTER,
             width_request=360,
@@ -199,7 +197,6 @@ class GameDetailsPage(Adw.NavigationPage):
         return self.download_area
 
     def _watch_downloads(self):
-        """Keep Play in step with Steam's downloads and the running game while the page is open."""
         self._check_download()
         self._download_timer = GLib.timeout_add_seconds(2, self._check_download)
 
@@ -218,7 +215,7 @@ class GameDetailsPage(Adw.NavigationPage):
         return GLib.SOURCE_CONTINUE
 
     def _show_download(self, result, error):
-        if error or not result or not hasattr(self, "primary"):
+        if error or not result:
             return
         item, rate, running = result
         self._set_running(running and self.game.props.installed)
@@ -270,7 +267,7 @@ class GameDetailsPage(Adw.NavigationPage):
             self._show_stop(hovered)
 
     def release(self):
-        if getattr(self, "_download_timer", 0):
+        if self._download_timer:
             GLib.source_remove(self._download_timer)
             self._download_timer = 0
         for handler in self._handlers:
@@ -340,7 +337,7 @@ class GameDetailsPage(Adw.NavigationPage):
         return group
 
     def refresh_artwork(self, kind):
-        if kind in getattr(self, "art_rows", {}):
+        if kind in self.art_rows:
             self._refresh_art_row(kind)
 
     def _refresh_art_row(self, kind):
@@ -609,10 +606,9 @@ class GameDetailsPage(Adw.NavigationPage):
         self._open(self.game.run_uri, f"Launching {self.game.props.name}")
 
     def _on_stop(self):
-        name = self.game.props.name
         self.primary.set_sensitive(False)
         self.primary.set_label("Stopping…")
-        self.window.toast(f"Stopping {name}")
+        self.window.toast(f"Stopping {self.game.props.name}")
         auth.run_async(lambda: steam_control.stop_game(self.game.props.appid), self._stopped)
 
     def _stopped(self, _result, _error):
@@ -632,7 +628,6 @@ class GameDetailsPage(Adw.NavigationPage):
             self.window.toast(f"Steam could not be opened: {error.message}")
 
     def _build_mod_manager_link(self):
-        """Which mod manager the Launch Mod Manager button opens for this game."""
         managers = [m for m in mod_managers.all_managers() if m.id != f"shortcut:{self.game.props.appid}"]
         row = Adw.ComboRow(
             title="Linked Mod Manager",

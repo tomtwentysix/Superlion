@@ -1,10 +1,4 @@
-"""The launch options editor, used for games and for presets.
-
-The launch options are shown as text that can be typed into directly, above
-every setting found across the user's games as a switch. Typing updates the
-switches, and switching settings on and off rewrites the text, so either way
-of working can be used at any time.
-"""
+"""The launch options editor for games and presets: the text and the settings below it each update the other."""
 
 from gi.repository import Adw, GLib, GObject, Gtk
 
@@ -23,7 +17,6 @@ CATEGORY_DESCRIPTIONS = {
     "Game Arguments": "Passed to the game itself, after %command%.",
 }
 
-
 WARNING_LABELS = {lo.NOT_NEEDED: "Not needed", lo.BREAKS: "Causes problems"}
 
 
@@ -32,8 +25,7 @@ def describe_warning(warning):
 
 
 def warning_row(title, warning, ignored, on_fix, on_ignore):
-    """A row for a warning, with buttons to fix it (on_fix(remove)) and to ignore it (on_ignore(ignore)); either can be
-    None. An old name can be renamed or removed."""
+    # Calls on_fix(remove) and on_ignore(ignore); either can be None.
     text = describe_warning(warning)
     row = Adw.ActionRow(
         title=GLib.markup_escape_text(title),
@@ -67,7 +59,6 @@ def _usage(setting):
 
 
 def ask_preset_name(parent, options, game_name, callback):
-    """Ask for the name of a new preset, suggesting one; callback(name) when confirmed."""
     dialog = Adw.AlertDialog(heading="Save as Preset", body=options)
     entry = Gtk.Entry(
         text=launch_presets.unique_name(launch_presets.suggest_name(options, game_name)),
@@ -90,20 +81,14 @@ def ask_preset_name(parent, options, game_name, callback):
 
 
 class LaunchOptionsEditor(Adw.Dialog):
-    """Edits launch options for a game (appid and game_name) or a preset (preset, or new_preset for a new one).
-
-    Save writes a game's launch options to Steam, relaunching Steam or queueing
-    them if it is running, or saves the preset, then emits "done" with them.
-    """
+    """For a game (appid and game_name) or a preset (preset, or new_preset). Emits "done" with the saved options."""
 
     __gsignals__ = {"done": (GObject.SignalFlags.RUN_FIRST, None, (str,))}
 
-    def __init__(
-        self, window, options="", game_name="", preset=None, new_preset=False, appid=None
-    ):
+    def __init__(self, window, options="", game_name="", preset=None, new_preset=False, appid=None):
         self.window = window
         self.game_name = game_name
-        self.appid = appid  # Save writes the launch options to Steam for this game; None for a preset.
+        self.appid = appid  # None for a preset
         self.preset = preset
         self.for_preset = preset is not None or new_preset
         if self.for_preset:
@@ -183,8 +168,7 @@ class LaunchOptionsEditor(Adw.Dialog):
         self.search = Gtk.SearchEntry(placeholder_text="Search settings", margin_top=6)
         self.search.connect("search-changed", lambda *_: self._apply_search())
         box.append(self.search)
-        clamp = Adw.Clamp(child=box, maximum_size=640)
-        return clamp
+        return Adw.Clamp(child=box, maximum_size=640)
 
     def text(self):
         return self.buffer.get_text(self.buffer.get_start_iter(), self.buffer.get_end_iter(), False).strip()
@@ -247,7 +231,6 @@ class LaunchOptionsEditor(Adw.Dialog):
             self._update_warnings()
 
     def _write_text(self):
-        """Rewrite the text from the settings switched on."""
         env, wrappers, arguments = [], {}, []
         enabled = [s for s in self._ordered_settings() if self.state[(s.kind, s.key)]["enabled"]]
         enabled.sort(key=lambda s: self.order.get((s.kind, s.key), len(self.order)))
@@ -302,7 +285,6 @@ class LaunchOptionsEditor(Adw.Dialog):
         self._apply_search()
 
     def _apply_search(self):
-        """Show only the settings matching every word searched for, and hide empty groups."""
         words = self.search.get_text().casefold().split()
         for group, entries in self.searchable:
             shown = 0
@@ -315,7 +297,6 @@ class LaunchOptionsEditor(Adw.Dialog):
         self.warning_group.set_visible(not words and bool(self.warning_rows))
 
     def _update_warnings(self):
-        """List the launch options' warnings, and mark the settings they are about."""
         for row in self.warning_rows:
             self.warning_group.remove(row)
         self.warning_rows = []

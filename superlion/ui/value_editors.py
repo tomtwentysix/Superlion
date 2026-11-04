@@ -1,8 +1,7 @@
-"""Editors for a launch option's value, added to its row in the launch options editor.
+"""Value editors for launch option rows.
 
-Each has value and set_value(value), and calls on_change(value) when the user
-changes it. Values are read with any quotes they were written with, and given
-back without them; launch_options.compose() quotes them where needed.
+Each has value and set_value(value), and calls on_change(value). Values may come
+in quoted but are given back unquoted; launch_options.compose() quotes them.
 """
 
 import re
@@ -14,7 +13,7 @@ from .. import launch_options as lo
 
 
 def _menu_button(icon, tooltip, heading, items, on_choose):
-    """A menu of (value, label) items that calls on_choose(value)."""
+    # items are [(value, label)].
     box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
     popover = Gtk.Popover(child=box)
     popover.add_css_class("menu")
@@ -55,12 +54,8 @@ class TextValue:
 
 
 class ChoiceValue:
-    """A drop-down of choices [(value, label)] ending with Other…, which shows an entry.
-
-    With missing set, a value that is not among the choices, such as an audio
-    output that is unplugged, is shown as "value (Not Connected)" instead of Other….
-    """
-
+    # choices are [(value, label)]. With missing set, a value not among them, such as an unplugged audio output, is
+    # shown as "value (Not Connected)" rather than under Other….
     def __init__(self, expander, title, value, choices, on_change, missing=False):
         self.choices = list(choices)
         self.missing = missing
@@ -104,12 +99,6 @@ class ChoiceValue:
 
 
 class ListValue:
-    """One row per item, each with a remove button, then an entry that adds items.
-
-    Enter adds what was typed and leaves the entry ready for the next; pasting
-    a list adds every item in it. For DLL overrides, each DLL has a load order.
-    """
-
     def __init__(self, expander, value, separator, known, on_change, dlls=False):
         self.expander = expander
         self.separator = separator

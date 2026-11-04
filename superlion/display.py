@@ -27,7 +27,7 @@ def _call(method, args=None):
 
 
 def _state():
-    """The current layout as (serial, monitors, layout).
+    """The current layout as (serial, monitors, layout, logical_sizes).
 
     monitors maps every connected monitor, on or off, to {"name", "modes",
     "scales", "color_modes"}, each mode being {"id", "width", "height",
@@ -140,7 +140,6 @@ def choose_mode(modes, width, height, fps):
         size = min(covering, key=lambda s: s[0] * s[1])
     else:
         size = max(sizes, key=lambda s: s[0] * s[1])
-    # 59.94 Hz counts as 60, so the closest refresh rate wins.
     return min(
         (m for m in fixed if (m["width"], m["height"]) == size),
         key=lambda m: abs(m["refresh"] - fps),

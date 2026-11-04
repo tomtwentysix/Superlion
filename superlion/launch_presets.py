@@ -1,9 +1,4 @@
-"""Launch option presets: named sets of launch options to reuse across games.
-
-Stored by Superlion only, in ~/.config/superlion/launch_presets.json. Applying a
-preset fills in a game's launch options, which are then saved to Steam like any
-other change.
-"""
+"""Named sets of launch options to reuse across games, kept in ~/.config/superlion/launch_presets.json."""
 
 import json
 import os
@@ -64,13 +59,11 @@ def remove(preset_id):
 
 
 def find_by_options(options):
-    """The preset with exactly these launch options, or None."""
     options = options.strip()
     return next((p for p in all_presets() if p.options == options), None)
 
 
 def unique_name(name):
-    """The name, followed by a number if a preset already uses it."""
     taken = {p.name.casefold() for p in all_presets()}
     candidate, number = name, 2
     while candidate.casefold() in taken:
@@ -107,11 +100,7 @@ MAX_NAME_PARTS = 3
 
 
 def suggest_name(options, game_name):
-    """A default name for a preset made from a game's launch options.
-
-    Names what the options do, such as "GameMode + MangoHud", from the parts it
-    recognises; otherwise names it after the game it came from.
-    """
+    # Such as "GameMode + MangoHud", or "<game> Options" when no part is recognised.
     words = options.split()
     parts = []
     for key, label in KNOWN_PARTS:
@@ -131,11 +120,7 @@ def suggest_name(options, game_name):
 
 
 def configured_games(config):
-    """{app ID: launch options} for every game with launch options set.
-
-    Includes Steam games (localconfig.vdf), non-Steam games (shortcuts.vdf) and
-    changes still waiting for Steam to close, which take precedence.
-    """
+    """{app ID: launch options} from localconfig.vdf, shortcuts.vdf and pending changes, which take precedence."""
     found = {}
     try:
         data = vdf.load(config.localconfig_path)

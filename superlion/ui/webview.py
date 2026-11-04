@@ -1,12 +1,11 @@
 """Embedded Steam store pages for buying, the cart and the wishlist."""
 
+import json
 from urllib.parse import urlparse
 
 import gi
 
 gi.require_version("WebKit", "6.0")
-import json  # noqa: E402
-
 from gi.repository import Adw, GLib, Gtk, WebKit  # noqa: E402
 
 from .. import config as config_mod  # noqa: E402
@@ -14,6 +13,7 @@ from .. import config as config_mod  # noqa: E402
 STEAM_DOMAINS = ("steampowered.com", "steamcommunity.com")
 
 _network_session = None
+_running = set()  # Hidden store pages, kept alive until their script finishes.
 
 
 def network_session():
@@ -102,11 +102,8 @@ def run_in_store(script, args, callback):
             view.call_async_javascript_function(script, -1, variant, None, None, None, done)
 
     handler = view.connect("load-changed", loaded)
-    _running.add(view)  # Kept alive until the script finishes.
+    _running.add(view)
     view.load_uri("https://store.steampowered.com/cart/")
-
-
-_running = set()
 
 
 class SteamWebPage(Adw.NavigationPage):
@@ -116,8 +113,7 @@ class SteamWebPage(Adw.NavigationPage):
         self.in_checkout = False
 
         self.webview = WebKit.WebView(network_session=network_session(), vexpand=True)
-        settings = self.webview.get_settings()
-        settings.set_enable_developer_extras(False)
+        self.webview.get_settings().set_enable_developer_extras(False)
         self.webview.connect("decide-policy", self._on_decide_policy)
         self.webview.connect("notify::uri", self._on_uri_changed)
         self.webview.connect("notify::title", self._on_title_changed)
@@ -148,9 +144,6 @@ class SteamWebPage(Adw.NavigationPage):
         toolbar.add_top_bar(header)
         self.set_child(toolbar)
 
-        self._load_signed_in(url)
-
-    def _load_signed_in(self, url):
         self.webview.load_uri(url)
 
     def _on_decide_policy(self, _view, decision, decision_type):

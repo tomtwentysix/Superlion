@@ -57,9 +57,6 @@ class Game(GObject.Object):
     logo = GObject.Property(type=str)
     header = GObject.Property(type=str)
 
-    def __init__(self, **props):
-        super().__init__(**props)
-
     @property
     def run_uri(self):
         if self.props.non_steam:
@@ -118,7 +115,6 @@ def read_last_played(localconfig_path):
 
 
 def load_installed(config):
-    """Games installed in the enabled library folders, excluding Steam's tools."""
     last_played = read_last_played(config.localconfig_path)
     games = {}
     for folder in config.library_folders():
@@ -185,7 +181,6 @@ def _shortcut_folder(entry):
 
 
 def load_shortcuts(config):
-    """Non-Steam games added to the Steam library, excluding hidden ones."""
     games = []
     for appid, entry in read_shortcuts(config).items():
         name = field(entry, "AppName") or ""
@@ -223,11 +218,7 @@ def custom_art(config, appid, kind):
 
 
 def set_custom_art(config, appid, kind, source):
-    """Use an image as the game's custom artwork, as Steam's "Set Custom Artwork" does.
-
-    Steam reads PNG and JPEG files from userdata/<account>/config/grid, named by
-    app ID and kind; any earlier custom image for the same kind is replaced.
-    """
+    # Steam reads custom artwork as PNG or JPEG from userdata/<account>/config/grid.
     if config_mod.SCREENSHOTS:
         return Path(source)
     source = Path(source)
@@ -260,11 +251,7 @@ def steamgriddb_url(name):
 
 
 def prefix_path(config, game):
-    """The game's Proton prefix (Wine "C: drive" folder), or None if it has none.
-
-    Steam keeps a prefix in the compatdata folder of the library the game is
-    installed in; non-Steam games use the main Steam folder's library.
-    """
+    """The game's Proton prefix, or None; non-Steam games keep theirs in the main Steam folder."""
     appid = str(game.props.appid)
     first = Path(game.props.library) if game.props.library else config.root
     candidates = [first] + [Path(f) for f in config.library_folders() if Path(f) != first]
@@ -276,14 +263,8 @@ def prefix_path(config, game):
 
 
 def game_matches(game, query):
-    """Whether a game should be shown for the search text in the library.
-
-    A game matches when the query appears anywhere in its name, when every query
-    word starts a word of the name (so "wars squad" finds "STAR WARS™:
-    Squadrons"), when the query is its initials (so "re3" finds "Resident Evil
-    3"), or when the query is its App ID. Case, ™ and ® signs, and punctuation
-    are ignored.
-    """
+    # Matches part of the name, word starts ("wars squad" finds "STAR WARS™: Squadrons"),
+    # initials ("re3" finds "Resident Evil 3") or the App ID.
     words = _words(query)
     if not words:
         return True  # Only punctuation was typed.
@@ -305,7 +286,6 @@ _SEPARATORS = re.compile(r"[\W_]+")
 
 
 def _words(text):
-    """Lower-case words of text, with trademark signs and punctuation removed."""
     return _SEPARATORS.sub(" ", _MARKS.sub("", text.casefold())).split()
 
 
@@ -335,11 +315,7 @@ def apply_metadata(games, metadata):
 
 
 def group_keys(game, mode):
-    """The groups a game belongs to, as (order, heading) pairs.
-
-    A game can appear under several genres. Groups without data, such as games
-    with no known release date, are gathered at the end.
-    """
+    """(order, heading) pairs; a game can be under several genres."""
     if mode == "genre":
         genres = list(game.props.genres or [])
         return [(0, g) for g in genres] or [(1, "Other")]

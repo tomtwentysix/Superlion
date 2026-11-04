@@ -1,5 +1,3 @@
-"""Adding a setting to the launch options editor: a suggestion, or one of the user's own."""
-
 from gi.repository import Adw, GLib, GObject, Gtk
 
 from .. import launch_options as lo

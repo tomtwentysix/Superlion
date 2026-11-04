@@ -1,6 +1,4 @@
-"""Taking EasyEffects out of the way while Sunshine streams, and bringing it back,
-and listing this PC's audio outputs.
-"""
+"""Taking EasyEffects out of the way while Sunshine streams, and listing audio outputs."""
 
 import json
 import shutil
@@ -14,13 +12,9 @@ FLATPAK_ID = "com.github.wwmm.easyeffects"
 STOPPED_PATH = Path(GLib.get_user_runtime_dir()) / "superlion" / "easyeffects-stopped"
 
 
+# Sunshine's commands run inside its service, which systemd stops wholesale on
+# restart, so anything that should outlive Sunshine gets its own scope.
 def detached(command):
-    """Start command in its own systemd scope.
-
-    Sunshine runs its commands inside its own service, and systemd stops
-    everything in a service when it stops or restarts, so anything that
-    should outlive Sunshine is moved out.
-    """
     subprocess.Popen(
         ["systemd-run", "--user", "--scope", "--collect", "--quiet", "--", *command],
         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
@@ -57,7 +51,6 @@ def bypass():
 
 
 def restore():
-    """Start EasyEffects again, hidden, if bypass() stopped it."""
     if not STOPPED_PATH.exists():
         return
     STOPPED_PATH.unlink()

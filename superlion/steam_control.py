@@ -36,11 +36,7 @@ def _flatpak_running():
 
 
 def is_running(config):
-    """Whether the Steam client is running.
-
-    Native Steam is detected from its pid file. Flatpak Steam records a PID from
-    inside its sandbox, which does not match the host, so flatpak is asked instead.
-    """
+    # Flatpak Steam's pid file holds a PID from inside its sandbox, so flatpak is asked instead.
     if config.steam_kind == "flatpak":
         return _flatpak_running()
     for pid_file in (Path.home() / ".steam" / "steam.pid", config.root / "steam.pid"):
@@ -62,14 +58,8 @@ BACKGROUND_LINKS = ("steam://rungameid/", "steam://run/", "steam://launch/")
 
 
 def open_uri(config, uri):
-    """Open a steam:// link in the Steam client the user selected.
-
-    If Steam is not running, it is started with the link, hidden unless the link
-    is for one of Steam's own pages. With a single Steam installed the desktop's
-    default handler is used otherwise. When both native and Flatpak Steam are
-    present, the default handler may belong to the other one, so the link is
-    passed to the configured command instead.
-    """
+    # With both native and Flatpak Steam installed, the desktop's default handler
+    # may be the other one, so the configured command is used.
     if not is_running(config):
         if uri.startswith(BACKGROUND_LINKS):
             _spawn(config, *start_options(config), uri)
@@ -87,7 +77,6 @@ def start_options(config):
 
 
 def start(config):
-    """Start Steam without showing its window."""
     if not config_mod.SCREENSHOTS:
         _spawn(config, *start_options(config))
 
@@ -126,12 +115,7 @@ def shutdown(config, callback):
 
 
 def relaunch(config, while_closed, callback):
-    """Close Steam, run while_closed(), then start Steam again.
-
-    callback(error) receives None on success or a message describing the failure.
-    Steam is restarted even if while_closed() fails, so the user is not left
-    without it.
-    """
+    """Close Steam, run while_closed(), then start Steam again; callback(error) gets None or a message."""
     if config_mod.SCREENSHOTS:
         callback(None)
         return
@@ -166,11 +150,9 @@ def _children(pid):
 
 
 def running_games():
-    """{app ID: reaper PID} for every game Steam has running.
+    """{app ID: reaper PID}; Steam runs each game under "reaper SteamLaunch AppId=<id>".
 
-    Steam runs every game under a "reaper SteamLaunch AppId=<id>" process, so
-    that process and everything below it make up the game. Non-Steam games use
-    their 32-bit shortcut ID here.
+    Non-Steam games use their 32-bit shortcut ID here.
     """
     games = {}
     for entry in os.listdir("/proc"):

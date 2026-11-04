@@ -56,7 +56,6 @@ def is_steam_root(path):
 
 
 def find_installs():
-    """Return detected Steam installations, native first, without duplicates."""
     home = Path.home()
     candidates = [
         (home / ".local/share/Steam", "native"),
@@ -125,9 +124,10 @@ def package_type(command):
 
 
 def is_valid_command(command):
-    first = command.split()[0] if command.split() else ""
-    if not first:
+    words = command.split()
+    if not words:
         return False
+    first = words[0]
     if os.sep in first:
         return os.access(first, os.X_OK)
     return shutil.which(first) is not None

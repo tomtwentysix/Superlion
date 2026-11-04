@@ -1,10 +1,6 @@
-"""Connecting to Steam with the user's own Steam Web API key.
+"""Steam Web API access with the user's own key, kept in GNOME Keyring.
 
-Valve offers every Steam account a free personal Web API key for exactly this
-kind of use (steamcommunity.com/dev). Superlion uses only the documented calls
-GetOwnedGames and GetPlayerSummaries, for the account already signed in to Steam
-on this computer. The key is kept in GNOME Keyring and never leaves this
-computer except in requests to api.steampowered.com.
+Only the documented GetOwnedGames and GetPlayerSummaries calls are used.
 """
 
 import json
@@ -50,7 +46,7 @@ def run_async(func, callback):
     def worker():
         try:
             result, error = func(), None
-        except Exception as exc:  # Reported to the caller on the main thread.
+        except Exception as exc:
             result, error = None, exc
         GLib.idle_add(lambda: (callback(result, error), GLib.SOURCE_REMOVE)[-1])
 
@@ -131,10 +127,7 @@ def check_key(key, steamid):
 
 
 def account_country(key, steamid):
-    """The account's country from its Steam profile, if it shows one. Blocking.
-
-    Remembered per account, as it rarely changes; "" when the profile has none.
-    """
+    """The profile's country code, cached per account, or "". Blocking."""
     cache = config_mod.cache_dir() / "account_country.json"
     try:
         known = json.loads(cache.read_text())

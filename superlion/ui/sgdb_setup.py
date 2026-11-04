@@ -8,10 +8,7 @@ LOGIN_PAGE = "https://www.steamgriddb.com/login"
 
 
 class SgdbKeySetup(Gtk.Box):
-    """Numbered steps that take the user from no account to a checked, saved key.
-
-    Emits "saved" once a key has been checked with SteamGridDB and stored.
-    """
+    """Emits "saved" once a key has been checked with SteamGridDB and stored."""
 
     __gsignals__ = {"saved": (GObject.SignalFlags.RUN_FIRST, None, ())}
 

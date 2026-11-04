@@ -92,7 +92,6 @@ class PreferencesDialog(Adw.PreferencesDialog):
     def _show_sign_in(self):
         for row in self._sign_in_rows:
             self.sign_in_group.remove(row)
-        rows = []
         if self.window.api_key:
             row = Adw.ActionRow(
                 title="Connected",
@@ -114,10 +113,8 @@ class PreferencesDialog(Adw.PreferencesDialog):
             button.add_css_class("suggested-action")
             button.connect("clicked", lambda *_: self._connect())
             row.add_suffix(button)
-        rows.append(row)
-        for row in rows:
-            self.sign_in_group.add(row)
-        self._sign_in_rows = rows
+        self.sign_in_group.add(row)
+        self._sign_in_rows = [row]
 
     def _build_store_group(self):
         group = Adw.PreferencesGroup(title="Steam Store")
@@ -138,7 +135,6 @@ class PreferencesDialog(Adw.PreferencesDialog):
     def _show_sgdb(self):
         for row in self._sgdb_rows:
             self.sgdb_group.remove(row)
-        rows = []
         if sgdb.load_key():
             row = Adw.ActionRow(title="Connected", subtitle="Artwork can be chosen from SteamGridDB.")
             change = Gtk.Button(label="Change Key…", valign=Gtk.Align.CENTER)
@@ -157,10 +153,8 @@ class PreferencesDialog(Adw.PreferencesDialog):
             button.add_css_class("suggested-action")
             button.connect("clicked", lambda *_: self._open_key_setup())
             row.add_suffix(button)
-        rows.append(row)
-        for row in rows:
-            self.sgdb_group.add(row)
-        self._sgdb_rows = rows
+        self.sgdb_group.add(row)
+        self._sgdb_rows = [row]
 
     def _open_key_setup(self):
         page = Adw.NavigationPage(title="Connect SteamGridDB")

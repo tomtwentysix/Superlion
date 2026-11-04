@@ -1,5 +1,3 @@
-"""The Superlion application object."""
-
 from pathlib import Path
 
 import gi
@@ -14,7 +12,6 @@ from . import steam_control  # noqa: E402
 from .ui.dedication import COMPANY, DEDICATION, KNOWN_FOR, NAME, TRIBUTE, YEARS  # noqa: E402
 
 PACKAGE_DIR = Path(__file__).parent
-# The interface's own icons, and the application icon kept with the project data.
 ICON_DIRS = (PACKAGE_DIR / "icons", PACKAGE_DIR.parent / "data" / "icons")
 VERSION = "0.9.10"
 DEVELOPER = "SolarFlare Developments"
@@ -69,7 +66,7 @@ class SuperlionApplication(Adw.Application):
     def _on_preferences(self, *_):
         window = self.props.active_window
         if window.config is None:
-            window.run_setup(first_run=True)  # Setup has not been completed yet.
+            window.run_setup(first_run=True)
             return
         from .ui.preferences import PreferencesDialog
 
