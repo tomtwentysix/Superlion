@@ -2,9 +2,7 @@
 
 # Superlion
 
-Superlion is a native GNOME app for your Steam library, built with GTK 4 and libadwaita. It shows the games you have installed and the ones you own, lets you browse the store, manage launch options, Proton builds and artwork, and stream games through Sunshine, all without opening Steam's own window. It suits anyone who would rather their games looked and behaved like the rest of their GNOME desktop.
-
-It is named after the Fowler B6 Super Lion steam road locomotive, and its icon shows the flywheel of Supreme of S J Wharton Ltd in Witney. Superlion is dedicated to the memory of John Wharton of S J Wharton Ltd (1953–2026).
+Superlion is a native Linux app for your Steam library, built with GTK 4 and libadwaita. It shows the games you have installed and the ones you own, lets you browse the store, manage launch options, Proton builds and artwork, and stream games through Sunshine, all without opening Steam's own window. It suits anyone who would rather their games looked and behaved like the rest of their desktop.
 
 ## What it does
 
@@ -41,7 +39,7 @@ To build the RPM yourself, run `packaging/build-rpm.sh`, which writes it to `dis
 
 ## Setup
 
-The first launch opens a setup wizard that finds your Steam installation, account and library folders. It also offers to connect your Steam account using your own Steam Web API key, which Valve provides free to every account, and SteamGridDB using a free API key. Both keys are kept in GNOME Keyring. If your profile's game details are private, the list of owned games is read through the Steam store sign-in instead. Everything the wizard sets can be changed later in Preferences.
+The first launch opens a setup wizard that finds your Steam installation, account and library folders. It also offers to connect your Steam account using your own Steam Web API key, which Valve provides free to every account, and SteamGridDB using a free API key. Both keys are kept in your system keyring. If your profile's game details are private, the list of owned games is read through the Steam store sign-in instead. Everything the wizard sets can be changed later in Preferences.
 
 ## How changes reach Steam
 
@@ -58,7 +56,7 @@ Custom artwork goes straight into `userdata/<account>/config/grid`, which Steam 
 
 ## Privacy
 
-Superlion only talks to Valve and SteamGridDB. API keys are kept in GNOME Keyring, and account data is cached in `~/.cache/superlion/`.
+Superlion only talks to Valve and SteamGridDB. API keys are kept in your system keyring, and account data is cached in `~/.cache/superlion/`.
 
 ## Files
 
@@ -72,3 +70,7 @@ Superlion only talks to Valve and SteamGridDB. API keys are kept in GNOME Keyrin
 | `~/.config/superlion/launch_settings.json` | Your custom settings for the launch options editor |
 | `~/.local/share/superlion/` | Changes waiting for Steam to close, the store's cookies, and covers for Sunshine |
 | `~/.cache/superlion/` | Owned-games list, Steam's app data, store data, downloaded artwork, automatic store matches and your account's country |
+
+## The name
+
+Superlion is named after the Fowler B6 Super Lion steam road locomotive, and is dedicated to the memory of John Wharton (1953–2026).

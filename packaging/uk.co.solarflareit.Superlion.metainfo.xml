@@ -7,8 +7,8 @@
   <project_license>GPL-3.0-or-later</project_license>
   <description>
     <p>
-      A native GNOME front end for your Steam library: installed and owned games, non-Steam
-      games, collections, mod managers, downloads, artwork from SteamGridDB and a built-in store.
+      A native Linux app for your Steam library, built with GTK 4 and libadwaita: installed and
+      owned games, non-Steam games, collections, mod managers, downloads, artwork from SteamGridDB and a built-in store.
     </p>
     <p>Dedicated to the memory of John Wharton of S J Wharton Ltd (1953–2026).</p>
   </description>

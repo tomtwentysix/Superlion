@@ -1,7 +1,7 @@
 Name:           superlion
 Version:        0.9.10
 Release:        1%{?dist}
-Summary:        Native GNOME front end for your Steam library
+Summary:        Native Linux app for your Steam library
 License:        GPL-3.0-or-later
 Vendor:         SolarFlare Developments
 Source0:        %{name}-%{version}.tar.gz
@@ -25,8 +25,8 @@ Requires:       gstreamer1-plugin-gtk4
 Recommends:     (gstreamer1-plugin-libav or gstreamer1-plugin-openh264)
 
 %description
-Superlion is a native GNOME (GTK 4 and libadwaita) front end for your Steam
-library: installed and owned games, non-Steam games, Steam collections and your
+Superlion is a native Linux app for your Steam library, built with GTK 4 and
+libadwaita: installed and owned games, non-Steam games, Steam collections and your
 own, mod managers, downloads, artwork from SteamGridDB and a built-in store.
 
 Dedicated to the memory of John Wharton of S J Wharton Ltd (1953-2026).

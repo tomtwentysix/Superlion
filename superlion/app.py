@@ -80,7 +80,7 @@ class SuperlionApplication(Adw.Application):
             copyright=f"© 2026 {DEVELOPER}",
             version=VERSION,
             comments=(
-                "A native GNOME front end for your Steam library. "
+                "A native Linux app for your Steam library. "
                 "Named after the Fowler B6 Super Lion steam road locomotive. Its icon shows the "
                 "flywheel of Supreme of S J Wharton Ltd in Witney.\n\n"
                 f"{DEDICATION}\n{TRIBUTE}\n{KNOWN_FOR}"
