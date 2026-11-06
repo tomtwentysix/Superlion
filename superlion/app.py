@@ -13,7 +13,7 @@ from .ui.dedication import COMPANY, DEDICATION, KNOWN_FOR, NAME, TRIBUTE, YEARS 
 
 PACKAGE_DIR = Path(__file__).parent
 ICON_DIRS = (PACKAGE_DIR / "icons", PACKAGE_DIR.parent / "data" / "icons")
-VERSION = "0.9.10"
+VERSION = "0.9.11"
 DEVELOPER = "SolarFlare Developments"
 
 

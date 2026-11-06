@@ -1,5 +1,5 @@
 Name:           superlion
-Version:        0.9.10
+Version:        0.9.11
 Release:        1%{?dist}
 Summary:        Native Linux app for your Steam library
 License:        GPL-3.0-or-later
@@ -65,6 +65,9 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/uk.co.solarflareit.Su
 %{_datadir}/dnf5/repos.override.d/50-superlion.repo
 
 %changelog
+* Fri Nov 06 2026 Tom <tom@solarflareit.co.uk> - 0.9.11-1
+- Clear Update Available from a game's cover and page once Steam has installed the update, without restarting Superlion.
+
 * Tue Nov 03 2026 Tom <tom@solarflareit.co.uk> - 0.9.10-1
 - Show when a game is running: Play on its page reads Running and becomes Stop, which ends the game as Steam's own Stop does.
 - Fix the cart count in the Store sidebar and the cart page when the cart has items.
