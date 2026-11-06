@@ -123,7 +123,10 @@ class DownloadsView(Gtk.Box):
             return
         self._busy = True
         auth.run_async(
-            lambda: (downloads.scan(config), downloads.current_rate(config), steam_control.is_running(config)),
+            lambda: (
+                downloads.scan(config), downloads.current_rate(config), steam_control.is_running(config),
+                library.read_builds(config),
+            ),
             self._show,
         )
 
@@ -164,7 +167,8 @@ class DownloadsView(Gtk.Box):
         self._busy = False
         if error or result is None:
             return
-        items, rate, running = result
+        items, rate, running, builds = result
+        library.apply_builds(self.window.installed, builds)
         self.closed_banner.set_revealed(not running)
         self._update_games(items)
         # Games with a newer build that Steam has not marked yet.

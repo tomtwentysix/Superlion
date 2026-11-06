@@ -51,6 +51,7 @@ class Game(GObject.Object):
     # has a newer build of that branch.
     build_id = GObject.Property(type=GObject.TYPE_INT64)
     branch = GObject.Property(type=str, default="public")
+    latest_builds = GObject.Property(type=GObject.TYPE_PYOBJECT)  # {branch: build ID} from appinfo.vdf
     update_available = GObject.Property(type=bool, default=False)
     cover = GObject.Property(type=str)
     hero = GObject.Property(type=str)
@@ -137,11 +138,48 @@ def load_installed(config):
                 install_dir=str(steamapps / "common" / state.get("installdir", "")),
                 library=str(folder),
                 last_played=played,
-                build_id=int(state.get("buildid", "0") or 0),
-                branch=(state.get("UserConfig") or {}).get("BetaKey") or "public",
+                build_id=_build_id(state),
+                branch=_branch(state),
                 **find_art(config.root, config.userdata, appid),
             )
     return list(games.values())
+
+
+def _build_id(state):
+    return int(state.get("buildid", "0") or 0)
+
+
+def _branch(state):
+    return (state.get("UserConfig") or {}).get("BetaKey") or "public"
+
+
+def read_builds(config):
+    """{appid: (build ID, branch)} from the app manifests. Blocking."""
+    builds = {}
+    for folder in config.library_folders():
+        for manifest in (Path(folder) / "steamapps").glob("appmanifest_*.acf"):
+            try:
+                state = vdf.get_path(vdf.load(manifest), "AppState") or {}
+                builds.setdefault(int(state.get("appid", "0") or 0), (_build_id(state), _branch(state)))
+            except (OSError, ValueError):
+                continue
+    return builds
+
+
+def apply_builds(games, builds):
+    """Catch up with updates Steam has installed since the library was loaded."""
+    for game in games:
+        build = builds.get(game.props.appid)
+        if build and build != (game.props.build_id, game.props.branch):
+            game.props.build_id, game.props.branch = build
+            _check_update(game)
+
+
+def _check_update(game):
+    latest = (game.props.latest_builds or {}).get(game.props.branch, 0)
+    available = bool(game.props.installed and game.props.build_id and latest > game.props.build_id)
+    if game.props.update_available != available:
+        game.props.update_available = available
 
 
 def shortcuts_path(config):
@@ -308,10 +346,8 @@ def apply_metadata(games, metadata):
             game.props.release_date = info.get("release", 0)
             game.props.genres = info.get("genres", [])
             game.props.vr = info.get("vr", 0)
-            latest = info.get("builds", {}).get(game.props.branch, 0)
-            game.props.update_available = bool(
-                game.props.installed and game.props.build_id and latest > game.props.build_id
-            )
+            game.props.latest_builds = info.get("builds", {})
+            _check_update(game)
 
 
 def group_keys(game, mode):

@@ -223,7 +223,7 @@ class GameDetailsPage(Adw.NavigationPage):
             self.download_area.set_visible(False)
             return
         if item is None:
-            self.primary.set_label(self.primary_label)
+            self.primary.set_label(self._play_label())
             self.primary.set_sensitive(True)
             self.primary.set_tooltip_text(None)
             self.download_area.set_visible(False)
@@ -239,6 +239,11 @@ class GameDetailsPage(Adw.NavigationPage):
         self.primary.set_sensitive(not busy)
         self.primary.set_tooltip_text("Steam is handling this; see the Downloads tab for details" if busy else None)
 
+    def _play_label(self):
+        if not self.game.props.installed:
+            return "Install"
+        return "Update and Play" if self.game.props.update_available else "Play"
+
     def _set_running(self, running):
         if running == self.running:
             return
@@ -247,7 +252,7 @@ class GameDetailsPage(Adw.NavigationPage):
         self.primary.set_tooltip_text(f"Stop {self.game.props.name}" if running else None)
         self._show_stop(running and self._primary_hovered)
         if not running:
-            self.primary.set_label(self.primary_label)
+            self.primary.set_label(self._play_label())
 
     def _show_stop(self, stop):
         """Running reads as "Stop" only while the pointer is over it."""
@@ -388,7 +393,7 @@ class GameDetailsPage(Adw.NavigationPage):
             box.remove(child)
         game = self.game
         if game.props.installed:
-            primary = Gtk.Button(label="Update and Play" if game.props.update_available else "Play")
+            primary = Gtk.Button(label=self._play_label())
             primary.connect("clicked", self._on_play)
         else:
             primary = Gtk.Button(label="Install")
@@ -397,7 +402,6 @@ class GameDetailsPage(Adw.NavigationPage):
         primary.add_css_class("pill")
         box.append(primary)
         self.primary = primary
-        self.primary_label = primary.get_label()
         self._primary_hovered = False
         self.running = False  # The next check marks a new button as running.
         hover = Gtk.EventControllerMotion()
