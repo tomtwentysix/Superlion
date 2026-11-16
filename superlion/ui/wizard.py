@@ -356,7 +356,25 @@ def item_count(count):
     return f"{count} installed item{'s' if count != 1 else ''}"
 
 
-def library_groups(add_group, state, get_parent):
+def show_folder_status(row, folder):
+    # Returns a function that checks the folder again and updates row.
+    icon = Gtk.Image(icon_name="dialog-warning-symbolic", tooltip_text="Not available")
+    icon.add_css_class("warning")
+    row.add_prefix(icon)
+
+    def update():
+        reachable = steam_paths.is_library_folder(folder)
+        icon.set_visible(not reachable)
+        row.set_subtitle(
+            item_count(steam_paths.count_manifests(folder)) if reachable
+            else "Not available: the drive may not be connected"
+        )
+
+    update()
+    return update
+
+
+def library_groups(add_group, state, get_parent, on_rescan=None):
     # Returns collect(state), which writes the choices into state and returns True
     # if a folder was removed from Steam, which changes Steam's files but not state.
     group = Adw.PreferencesGroup(
@@ -384,10 +402,9 @@ def library_groups(add_group, state, get_parent):
         if steam_error.get_parent() is not None:
             group.remove(steam_error)
         main = Path(state.steam_root).resolve()
-        for folder, count in steam_paths.find_libraries(state.steam_root):
-            row = Adw.SwitchRow(
-                title=short_path(folder), subtitle=item_count(count), active=str(folder) not in disabled
-            )
+        for folder, _count in steam_paths.find_libraries(state.steam_root):
+            row = Adw.SwitchRow(title=short_path(folder), active=str(folder) not in disabled)
+            show_folder_status(row, folder)
             if Path(folder).resolve() != main:
                 remove = Gtk.Button(icon_name="user-trash-symbolic", tooltip_text="Remove From Steam", valign=Gtk.Align.CENTER)
                 remove.add_css_class("flat")
@@ -439,14 +456,17 @@ def library_groups(add_group, state, get_parent):
     error_label.add_css_class("error")
     error_label.add_css_class("caption")
     rows = {}
+    updates = {}
 
     def add_extra_row(path):
-        row = Adw.ActionRow(title=short_path(path), subtitle=item_count(steam_paths.count_manifests(path)))
+        row = Adw.ActionRow(title=short_path(path))
+        updates[path] = show_folder_status(row, path)
         remove = Gtk.Button(icon_name="user-trash-symbolic", tooltip_text="Remove", valign=Gtk.Align.CENTER)
         remove.add_css_class("flat")
 
         def on_remove(*_):
             extras.remove(path)
+            updates.pop(path)
             extra_group.remove(rows.pop(path))
 
         remove.connect("clicked", on_remove)
@@ -483,8 +503,10 @@ def library_groups(add_group, state, get_parent):
 
     def rescan(*_):
         fill_steam()
-        for path, row in rows.items():
-            row.set_subtitle(item_count(steam_paths.count_manifests(path)))
+        for update in updates.values():
+            update()
+        if on_rescan:
+            on_rescan()
 
     rescan_button.connect("clicked", rescan)
     fill_steam()

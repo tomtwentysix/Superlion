@@ -31,7 +31,7 @@ class PreferencesDialog(Adw.PreferencesDialog):
             steam.add(self._build_files_group())
         steam.add(ProtonGroup(self, window))
         self.account = account_choice(steam.add, self.state)
-        self.collect_libraries = library_groups(steam.add, self.state, lambda: self)
+        self.collect_libraries = library_groups(steam.add, self.state, lambda: self, window.update_setup_banner)
         self.add(steam)
 
         streaming = Adw.PreferencesPage(title="Streaming", icon_name="tv-symbolic")

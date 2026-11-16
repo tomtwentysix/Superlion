@@ -310,13 +310,16 @@ class SuperlionWindow(Adw.ApplicationWindow):
         marker.parent.mkdir(parents=True, exist_ok=True)
         marker.touch()
 
+    def update_setup_banner(self):
+        problems = self.config.problems() if self.config else []
+        self.setup_banner.set_title(problems[0] if problems else "")
+        self.setup_banner.set_revealed(bool(problems))
+
     def reload(self):
         if self.config is None:
             self.library.set_games([])
             return
-        problems = self.config.problems()
-        self.setup_banner.set_title(problems[0] if problems else "")
-        self.setup_banner.set_revealed(bool(problems))
+        self.update_setup_banner()
         self._apply_pending_if_closed()
         self.library.refresh_sidebar()
         self.installed = (
