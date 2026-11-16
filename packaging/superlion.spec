@@ -1,5 +1,5 @@
 Name:           superlion
-Version:        0.9.12
+Version:        0.9.13
 Release:        1%{?dist}
 Summary:        Native Linux app for your Steam library
 License:        GPL-3.0-or-later
@@ -65,6 +65,9 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/uk.co.solarflareit.Su
 %{_datadir}/dnf5/repos.override.d/50-superlion.repo
 
 %changelog
+* Mon Nov 16 2026 Tom <tom@solarflareit.co.uk> - 0.9.13-1
+- A second click on Play no longer stops a game that is still loading; Stop needs the pointer to leave the button and come back.
+
 * Mon Nov 16 2026 Tom <tom@solarflareit.co.uk> - 0.9.12-1
 - Remove library folders from Steam in setup and Preferences, and rescan them.
 - Launch options for GameMode, MangoHud, Gamescope and other tools can only be turned on when the tool is installed.
