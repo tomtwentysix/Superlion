@@ -261,6 +261,10 @@ class LaunchOptionsPage(Adw.PreferencesPage):
         active = [p for p in problems if p[2].id not in ignored.get(p[0], set())]
         if active:
             parts.insert(0, describe_warning(active[0][2]))
+        config = self.window.config
+        missing = lo.missing_tool(setting.kind, setting.key, config.steam_kind if config else "native")
+        if missing:
+            parts.insert(0, f"Needs {missing}, which is not installed")
         skipped = len({p[0] for p in problems}) - len({p[0] for p in active})
         if skipped:
             parts.append(f"Ignored in {skipped} game{'s' if skipped != 1 else ''}")
@@ -284,7 +288,7 @@ class LaunchOptionsPage(Adw.PreferencesPage):
             if fix == "Rename":
                 actions.append(("Remove From All Games", lambda: self._confirm_fix(setting, "Remove", active, True)))
         for label, callback in actions:
-            button = Gtk.Button(child=Gtk.Label(label=label, xalign=0))
+            button = Gtk.Button(child=Gtk.Label(label=label, xalign=0), sensitive=not (missing and label.startswith("Turn On")))
             button.add_css_class("flat")
             button.connect("clicked", lambda _b, c=callback: (popover.popdown(), c()))
             box.append(button)

@@ -333,8 +333,15 @@ class LaunchOptionsEditor(Adw.Dialog):
         lo.set_ignored(self.appid, warning, ignore)
         self._update_warnings()
 
+    def _missing(self, key):
+        config = self.window.config
+        return lo.missing_tool(*key, config.steam_kind if config else "native")
+
     def _subtitle(self, setting):
         parts = [setting.description, _usage(setting)]
+        missing = self._missing((setting.kind, setting.key))
+        if missing:
+            parts.insert(0, f"Needs {missing}, which is not installed")
         if setting.kind == lo.ENV and setting.title != setting.key:
             parts.insert(0, setting.key)
         return GLib.markup_escape_text(" · ".join(p for p in parts if p))
@@ -343,6 +350,15 @@ class LaunchOptionsEditor(Adw.Dialog):
         key = (setting.kind, setting.key)
         state = self.state[key]
         title = GLib.markup_escape_text(setting.title)
+        row = self._new_row(setting, key, state, title)
+        self._update_sensitive(key, row)
+        return row
+
+    def _update_sensitive(self, key, row):
+        # A setting already on stays usable, so it can be turned off.
+        row.set_sensitive(self.state[key]["enabled"] or not self._missing(key))
+
+    def _new_row(self, setting, key, state, title):
         if not (setting.takes_value or (setting.kind == lo.ENV and state["value"] != "1")):
             row = Adw.SwitchRow(title=title, subtitle=self._subtitle(setting), active=state["enabled"])
             row.connect("notify::active", lambda r, _p: self._on_row_changed(key, enabled=r.get_active()))
@@ -381,6 +397,7 @@ class LaunchOptionsEditor(Adw.Dialog):
             else:
                 row.set_enable_expansion(state["enabled"])
                 editor.set_value(state["value"])
+            self._update_sensitive(key, row)
         self._syncing = False
 
     def _on_row_changed(self, key, enabled=None, value=None):

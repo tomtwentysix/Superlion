@@ -7,6 +7,7 @@ arguments …. Words not recognised are kept as written.
 import json
 import os
 import re
+import shutil
 from collections import Counter
 from itertools import combinations
 from dataclasses import asdict, dataclass, field
@@ -797,6 +798,49 @@ class Setting:
         if self.values:
             return self.values.most_common(1)[0][0]
         return self.default
+
+
+# What a setting needs: (tool name, commands, Vulkan layer files, Flatpak extension).
+# Any one of the commands or layers is enough for native Steam; Flatpak Steam runs
+# games in its own runtime, so only the extension counts there. GameMode is part of
+# the Steam Flatpak, so it needs no extension.
+REQUIREMENTS = {
+    (WRAPPER, "gamemoderun"): ("GameMode", ["gamemoderun"], [], ""),
+    (WRAPPER, "mangohud"): ("MangoHud", ["mangohud"], [], "org.freedesktop.Platform.VulkanLayer.MangoHud"),
+    (ENV, "MANGOHUD"): ("MangoHud", [], ["MangoHud*.json"], "org.freedesktop.Platform.VulkanLayer.MangoHud"),
+    (ENV, "MANGOHUD_CONFIG"): ("MangoHud", ["mangohud"], ["MangoHud*.json"], "org.freedesktop.Platform.VulkanLayer.MangoHud"),
+    (WRAPPER, "gamescope"): ("Gamescope", ["gamescope"], [], "org.freedesktop.Platform.VulkanLayer.gamescope"),
+    (WRAPPER, "obs-gamecapture"): ("OBS Vulkan Capture", ["obs-gamecapture"], [], "org.freedesktop.Platform.VulkanLayer.OBSVkCapture"),
+    (WRAPPER, "game-performance"): ("CachyOS Settings", ["game-performance"], [], None),
+    (WRAPPER, "strangle"): ("libstrangle", ["strangle"], [], None),
+    (WRAPPER, "prime-run"): ("NVIDIA PRIME", ["prime-run"], [], None),
+    (ENV, "ENABLE_VKBASALT"): ("vkBasalt", [], ["vkBasalt*.json"], "org.freedesktop.Platform.VulkanLayer.vkBasalt"),
+}
+
+LAYER_DIRS = [
+    Path.home() / ".local/share/vulkan/implicit_layer.d",
+    Path("/etc/vulkan/implicit_layer.d"),
+    Path("/usr/local/share/vulkan/implicit_layer.d"),
+    Path("/usr/share/vulkan/implicit_layer.d"),
+]
+FLATPAK_RUNTIME_DIRS = [Path.home() / ".local/share/flatpak/runtime", Path("/var/lib/flatpak/runtime")]
+
+
+def missing_tool(kind, key, steam_kind="native"):
+    """The name of the tool a setting needs that is not installed, or None."""
+    if (kind, key) not in REQUIREMENTS:
+        return None
+    name, commands, layers, extension = REQUIREMENTS[(kind, key)]
+    if steam_kind == "flatpak":
+        # No extension to look for: bundled with Steam, or cannot be told.
+        if not extension:
+            return None
+        return None if any((d / extension).is_dir() for d in FLATPAK_RUNTIME_DIRS) else name
+    if any(shutil.which(c) for c in commands):
+        return None
+    if any(next(d.glob(pattern), None) for d in LAYER_DIRS for pattern in layers):
+        return None
+    return name
 
 
 def default_category(kind):
