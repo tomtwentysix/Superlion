@@ -203,6 +203,82 @@ class MediaCarousel(Gtk.Box):
             self.carousel.scroll_to(self.carousel.get_nth_page(index), True)
 
 
+def storage_size(data):
+    """The disk space a game asks for in its system requirements, such as "70 GB"."""
+    for key in ("linux_requirements", "pc_requirements"):
+        requirements = data.get(key)
+        if not isinstance(requirements, dict):
+            continue  # Steam sends an empty list when there are none.
+        for level in ("recommended", "minimum"):
+            match = re.search(r"(?:Storage|Hard Drive):</strong>\s*([^<]+)", requirements.get(level) or "")
+            if match:
+                return re.sub(r"(?i)\s*(available|free)?\s*(space)?\s*$", "", match.group(1).strip())
+    return ""
+
+
+RATING_BOARDS = {
+    "US": "esrb", "CA": "esrb", "MX": "esrb", "DE": "usk", "AU": "oflc", "NZ": "nzoflc",
+    "JP": "cero", "BR": "dejus", "KR": "kgrb", "TW": "csrr", "RU": "crl", "ZA": "fpb",
+    "ID": "igrs", "SG": "mda",
+}
+
+
+def age_rating(data, region):
+    """The age rating to show for a store region, such as "PEGI 18", or ""."""
+    ratings = data.get("ratings") or {}
+    board = RATING_BOARDS.get(region.upper(), "pegi")
+    # Games often lack the local board; Steam's own minimum age is the fallback.
+    value = str((ratings.get(board) or {}).get("rating") or "").strip()
+    if not value:
+        age = str(data.get("required_age") or "0").strip()
+        return f"{age}+" if age.isdigit() and int(age) else ""
+    value = "E10+" if value.lower() == "e10" else value.upper()
+    return f"{'NZ' if board == 'nzoflc' else board.upper()} {value}"
+
+
+def facts_table(data, region):
+    """Key facts from a store page as a wrapping table of captioned cells."""
+    release = data.get("release_date") or {}
+    platforms = data.get("platforms") or {}
+    languages = [plain_text(part) for part in (data.get("supported_languages") or "").split("<br>")[0].split(",")]
+    languages = [name.rstrip("*").strip() for name in languages if name.strip()]
+    metacritic = (data.get("metacritic") or {}).get("score")
+    controller = {"full": "Full", "partial": "Partial"}.get(data.get("controller_support"), "")
+    facts = [
+        ("Size", storage_size(data), None),
+        ("Age Rating", age_rating(data, region), None),
+        ("Release Date", ("Coming soon: " if release.get("coming_soon") else "") + release.get("date", ""), None),
+        ("Developer", ", ".join(data.get("developers", [])), None),
+        ("Publisher", ", ".join(data.get("publishers", [])), None),
+        ("Genres", ", ".join(g.get("description", "") for g in data.get("genres", [])), None),
+        ("Platforms", ", ".join(p.capitalize() if p != "mac" else "macOS" for p, ok in platforms.items() if ok), None),
+        ("Controller Support", controller, None),
+        ("Languages", f"{len(languages)}" if len(languages) > 1 else "".join(languages), ", ".join(languages)),
+        ("Metacritic", str(metacritic) if metacritic else "", None),
+    ]
+    flow = Gtk.FlowBox(
+        selection_mode=Gtk.SelectionMode.NONE, homogeneous=True,
+        min_children_per_line=2, max_children_per_line=4,
+        row_spacing=18, column_spacing=18,
+        margin_top=18, margin_bottom=18, margin_start=18, margin_end=18,
+    )
+    for title, value, tooltip in facts:
+        if not value:
+            continue
+        cell = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2, tooltip_text=tooltip)
+        caption = Gtk.Label(label=title, xalign=0)
+        caption.add_css_class("caption-heading")
+        caption.add_css_class("dim-label")
+        cell.append(caption)
+        cell.append(Gtk.Label(label=value, xalign=0, wrap=True, selectable=True))
+        flow.append(cell)
+        flow.get_last_child().set_focusable(False)
+    frame = Gtk.Frame(child=flow)
+    frame.add_css_class("view")
+    frame.add_css_class("card")
+    return frame
+
+
 def description_widgets(data):
     """The short description, plus the full "About This Game" text in an expander."""
     widgets = []

@@ -7,7 +7,7 @@ from gi.repository import Adw, GLib, Gtk, Pango
 from .. import auth, steam_control, store_account, store_api
 from . import images
 from .library_view import SidebarRow
-from .media import MediaCarousel, description_widgets
+from .media import MediaCarousel, description_widgets, facts_table
 from .webview import CART_SCRIPT, STATE_SCRIPT, WISHLIST_SCRIPT, run_in_store
 
 CATEGORIES = [
@@ -828,6 +828,7 @@ class StoreAppPage(Adw.NavigationPage):
             header_image = Gtk.Picture(content_fit=Gtk.ContentFit.COVER, can_shrink=True, height_request=280)
             images.load(data.get("header_image", ""), 920, 430, header_image.set_paintable)
             self.content.append(header_image)
+        self.content.append(facts_table(data, self.window.store_region))
 
         title = Gtk.Label(label=data.get("name", ""), wrap=True, xalign=0)
         title.add_css_class("title-1")
@@ -856,23 +857,6 @@ class StoreAppPage(Adw.NavigationPage):
 
         for widget in description_widgets(data):
             self.content.append(widget)
-
-        group = Adw.PreferencesGroup(title="Information")
-        release = data.get("release_date") or {}
-        platforms = data.get("platforms") or {}
-        rows = [
-            ("Developer", ", ".join(data.get("developers", []))),
-            ("Publisher", ", ".join(data.get("publishers", []))),
-            ("Release Date", ("Coming soon: " if release.get("coming_soon") else "") + release.get("date", "")),
-            ("Genres", ", ".join(g.get("description", "") for g in data.get("genres", []))),
-            ("Platforms", ", ".join(p.capitalize() if p != "mac" else "macOS" for p, ok in platforms.items() if ok)),
-        ]
-        for label, value in rows:
-            if value:
-                row = Adw.ActionRow(title=label, subtitle=GLib.markup_escape_text(value), subtitle_selectable=True)
-                row.add_css_class("property")
-                group.add(row)
-        self.content.append(group)
 
     def _build_buttons(self, data, options):
         box = Gtk.Box(spacing=12)

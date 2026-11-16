@@ -11,7 +11,7 @@ from .artwork_picker import choose_file
 from .launch_options_editor import LaunchOptionsEditor, describe_warning
 from .library_view import collections_popover, game_menu
 from .downloads_view import describe
-from .media import MediaCarousel, description_widgets, news_group
+from .media import MediaCarousel, description_widgets, facts_table, news_group
 
 
 def format_last_played(timestamp):
@@ -694,6 +694,7 @@ class GameDetailsPage(Adw.NavigationPage):
             self.media = MediaCarousel(data)
             if not self.media.is_empty:
                 self.store_box.append(self.media)
+            self.store_box.append(facts_table(data, region))
             for widget in description_widgets(data):
                 self.store_box.append(widget)
 
