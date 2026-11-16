@@ -185,6 +185,26 @@ def find_libraries(root):
     return libraries
 
 
+def unregister_library(root, folder):
+    """Take folder out of Steam's library lists. Steam must be closed, or it writes them back."""
+    # Steam keeps the same list in two places and reads either.
+    for path in (Path(root) / "steamapps" / "libraryfolders.vdf", Path(root) / "config" / "libraryfolders.vdf"):
+        if not path.is_file():
+            continue
+        data = vdf.load(path)
+        entries = vdf.get_path(data, "libraryfolders")
+        if not isinstance(entries, dict):
+            continue
+        target = Path(folder).resolve()
+        kept = [e for e in entries.values() if not (isinstance(e, dict) and Path(e.get("path", "")).resolve() == target)]
+        if len(kept) == len(entries):
+            continue
+        # Steam numbers the entries from 0 with no gaps.
+        entries.clear()
+        entries.update({str(i): e for i, e in enumerate(kept)})
+        vdf.dump(data, path)
+
+
 def count_manifests(folder):
     try:
         return sum(1 for _ in (Path(folder) / "steamapps").glob("appmanifest_*.acf"))

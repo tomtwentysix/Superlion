@@ -352,21 +352,79 @@ def apply_account(state, account, region):
         state.region = region.value.upper()
 
 
+def item_count(count):
+    return f"{count} installed item{'s' if count != 1 else ''}"
+
+
 def library_groups(add_group, state, get_parent):
     # Returns collect(state), which writes the choices into state.
     group = Adw.PreferencesGroup(
         title="Library Folders", description="Games in folders that are turned off are hidden."
     )
     add_group(group)
+    rescan_button = Gtk.Button(icon_name="view-refresh-symbolic", tooltip_text="Rescan", valign=Gtk.Align.CENTER)
+    rescan_button.add_css_class("flat")
+    group.set_header_suffix(rescan_button)
+    steam_error = Gtk.Label(xalign=0, wrap=True, margin_top=6, visible=False)
+    steam_error.add_css_class("error")
+    steam_error.add_css_class("caption")
     switches = {}
-    for folder, count in steam_paths.find_libraries(state.steam_root):
-        row = Adw.SwitchRow(
-            title=short_path(folder),
-            subtitle=f"{count} installed item{'s' if count != 1 else ''}",
-            active=str(folder) not in state.disabled_libraries,
+    disabled = set(state.disabled_libraries)
+
+    def fill_steam():
+        for path, row in switches.items():
+            if not row.get_active():
+                disabled.add(path)
+            else:
+                disabled.discard(path)
+            group.remove(row)
+        switches.clear()
+        if steam_error.get_parent() is not None:
+            group.remove(steam_error)
+        main = Path(state.steam_root).resolve()
+        for folder, count in steam_paths.find_libraries(state.steam_root):
+            row = Adw.SwitchRow(
+                title=short_path(folder), subtitle=item_count(count), active=str(folder) not in disabled
+            )
+            if Path(folder).resolve() != main:
+                remove = Gtk.Button(icon_name="user-trash-symbolic", tooltip_text="Remove From Steam", valign=Gtk.Align.CENTER)
+                remove.add_css_class("flat")
+                remove.connect("clicked", lambda _b, f=folder: confirm_unregister(f))
+                row.add_suffix(remove)
+            switches[str(folder)] = row
+            group.add(row)
+        group.add(steam_error)
+
+    def confirm_unregister(folder):
+        running = steam_control.is_running(state)
+        body = (
+            f"Steam will stop using {short_path(folder)}. The games in it stay on the drive, "
+            "and the folder can be added to Steam again later."
         )
-        switches[str(folder)] = row
-        group.add(row)
+        if running:
+            body += " Steam will be closed and started again."
+        dialog = Adw.AlertDialog(heading="Remove Library Folder?", body=body)
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("remove", "Close Steam and Remove" if running else "Remove")
+        dialog.set_response_appearance("remove", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.connect("response", lambda _d, response: response == "remove" and unregister(folder, running))
+        dialog.present(get_parent())
+
+    def unregister(folder, running):
+        def done(error):
+            steam_error.set_label(error or "")
+            steam_error.set_visible(bool(error))
+            rescan()
+
+        if running:
+            steam_control.relaunch(state, lambda: steam_paths.unregister_library(state.steam_root, folder), done)
+            return
+        try:
+            steam_paths.unregister_library(state.steam_root, folder)
+        except (OSError, ValueError) as exc:
+            done(f"The folder could not be removed: {exc}")
+            return
+        done(None)
 
     extra_group = Adw.PreferencesGroup(
         title="Other Folders", description="Library folders that Steam does not list, such as an old drive."
@@ -379,7 +437,7 @@ def library_groups(add_group, state, get_parent):
     rows = {}
 
     def add_extra_row(path):
-        row = Adw.ActionRow(title=short_path(path), subtitle=f"{steam_paths.count_manifests(path)} installed items")
+        row = Adw.ActionRow(title=short_path(path), subtitle=item_count(steam_paths.count_manifests(path)))
         remove = Gtk.Button(icon_name="user-trash-symbolic", tooltip_text="Remove", valign=Gtk.Align.CENTER)
         remove.add_css_class("flat")
 
@@ -418,6 +476,14 @@ def library_groups(add_group, state, get_parent):
         dialog.select_folder(get_parent(), None, done)
 
     add_button.connect("activated", on_add)
+
+    def rescan(*_):
+        fill_steam()
+        for path, row in rows.items():
+            row.set_subtitle(item_count(steam_paths.count_manifests(path)))
+
+    rescan_button.connect("clicked", rescan)
+    fill_steam()
 
     def collect(target):
         target.disabled_libraries = [p for p, row in switches.items() if not row.get_active()]
