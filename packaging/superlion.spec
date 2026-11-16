@@ -1,5 +1,5 @@
 Name:           superlion
-Version:        0.9.13
+Version:        0.9.14
 Release:        1%{?dist}
 Summary:        Native Linux app for your Steam library
 License:        GPL-3.0-or-later
@@ -65,6 +65,10 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/uk.co.solarflareit.Su
 %{_datadir}/dnf5/repos.override.d/50-superlion.repo
 
 %changelog
+* Mon Nov 16 2026 Tom <tom@solarflareit.co.uk> - 0.9.14-1
+- The banner about an unreachable library folder clears once the folder is removed from Steam or its drive is connected again.
+- Rescan and Refresh check every library folder, and folders that cannot be reached are marked Not Available.
+
 * Mon Nov 16 2026 Tom <tom@solarflareit.co.uk> - 0.9.13-1
 - A second click on Play no longer stops a game that is still loading; Stop needs the pointer to leave the button and come back.
 
