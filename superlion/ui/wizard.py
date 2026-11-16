@@ -357,7 +357,8 @@ def item_count(count):
 
 
 def library_groups(add_group, state, get_parent):
-    # Returns collect(state), which writes the choices into state.
+    # Returns collect(state), which writes the choices into state and returns True
+    # if a folder was removed from Steam, which changes Steam's files but not state.
     group = Adw.PreferencesGroup(
         title="Library Folders", description="Games in folders that are turned off are hidden."
     )
@@ -370,6 +371,7 @@ def library_groups(add_group, state, get_parent):
     steam_error.add_css_class("caption")
     switches = {}
     disabled = set(state.disabled_libraries)
+    removed = []
 
     def fill_steam():
         for path, row in switches.items():
@@ -412,6 +414,8 @@ def library_groups(add_group, state, get_parent):
 
     def unregister(folder, running):
         def done(error):
+            if not error:
+                removed.append(folder)
             steam_error.set_label(error or "")
             steam_error.set_visible(bool(error))
             rescan()
@@ -488,6 +492,7 @@ def library_groups(add_group, state, get_parent):
     def collect(target):
         target.disabled_libraries = [p for p, row in switches.items() if not row.get_active()]
         target.extra_libraries = list(extras)
+        return bool(removed)
 
     return collect
 

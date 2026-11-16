@@ -186,10 +186,12 @@ class PreferencesDialog(Adw.PreferencesDialog):
                 self.window.toast("The selected account is not valid, so preferences were not saved.")
                 return
             apply_account(self.state, self.account, self.region)
-            self.collect_libraries(self.state)
+            libraries_removed = self.collect_libraries(self.state)
         if self.state != self.window.config:
             config_mod.save(self.state)
             self.window.set_config(self.state)
+        elif not folder_changed and libraries_removed:
+            self.window.reload()
 
     def _run_wizard(self):
         # The wizard starts from the saved settings; unsaved changes here are dropped.
