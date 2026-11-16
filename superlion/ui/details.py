@@ -248,9 +248,12 @@ class GameDetailsPage(Adw.NavigationPage):
         if running == self.running:
             return
         self.running = running
+        # The pointer is usually still on the button from pressing Play, so a second
+        # click there must not stop the game; Stop needs the pointer to come back.
+        self._stop_armed = False
         self.primary.set_sensitive(True)
         self.primary.set_tooltip_text(f"Stop {self.game.props.name}" if running else None)
-        self._show_stop(running and self._primary_hovered)
+        self._show_stop(False)
         if not running:
             self.primary.set_label(self._play_label())
 
@@ -268,8 +271,10 @@ class GameDetailsPage(Adw.NavigationPage):
 
     def _on_primary_hover(self, hovered):
         self._primary_hovered = hovered
+        if hovered and self.running:
+            self._stop_armed = True
         if self.running and self.primary.get_sensitive():
-            self._show_stop(hovered)
+            self._show_stop(hovered and self._stop_armed)
 
     def release(self):
         if self._download_timer:
@@ -403,6 +408,7 @@ class GameDetailsPage(Adw.NavigationPage):
         box.append(primary)
         self.primary = primary
         self._primary_hovered = False
+        self._stop_armed = False
         self.running = False  # The next check marks a new button as running.
         hover = Gtk.EventControllerMotion()
         hover.connect("enter", lambda *_: self._on_primary_hover(True))
@@ -605,7 +611,8 @@ class GameDetailsPage(Adw.NavigationPage):
 
     def _on_play(self, _button):
         if self.running:
-            self._on_stop()
+            if self._stop_armed:
+                self._on_stop()
             return
         self._open(self.game.run_uri, f"Launching {self.game.props.name}")
 
@@ -619,7 +626,7 @@ class GameDetailsPage(Adw.NavigationPage):
         # A game that ended is noticed by the next check; one still running can be stopped again.
         if self.running and not self.primary.get_sensitive():
             self.primary.set_sensitive(True)
-            self._show_stop(self._primary_hovered)
+            self._show_stop(self._primary_hovered and self._stop_armed)
 
     def _on_install(self, _button):
         self.window.install_game(self.game.props.appid, self.game.props.name)
