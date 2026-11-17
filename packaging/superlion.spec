@@ -1,5 +1,5 @@
 Name:           superlion
-Version:        0.9.15
+Version:        0.10.0
 Release:        1%{?dist}
 Summary:        Native Linux app for your Steam library
 License:        GPL-3.0-or-later
@@ -65,6 +65,14 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/uk.co.solarflareit.Su
 %{_datadir}/dnf5/repos.override.d/50-superlion.repo
 
 %changelog
+* Tue Nov 17 2026 Tom <tom@solarflareit.co.uk> - 0.10.0-1
+- Uninstall Steam games from a game's page or the library, through Steam's own confirmation and without its main window.
+- Remove non-Steam games, mod managers included, from the library.
+- Start waiting updates and resume paused downloads from Downloads, one game at a time or all at once.
+- Update Immediately, on a game's Steam Settings tab, downloads its updates as soon as Steam finds them.
+- Mod managers have a Settings button that opens their page, with Proton, launch options, folders and the games that use them.
+- Steam restarts without asking when changes need it to close, unless a game or mod manager is running; the prompt then names what would close.
+
 * Mon Nov 16 2026 Tom <tom@solarflareit.co.uk> - 0.9.15-1
 - Store pages and a game's Overview show a table of facts under the trailers and screenshots: size, age rating for your store region, release date, developer, publisher, genres, platforms, controller support, languages and Metacritic score.
 
