@@ -118,4 +118,5 @@ def update_manifests(config, changes):
             state["AutoUpdateBehavior"] = str(change["auto_update"])
         tmp = path.with_suffix(".tmp")
         tmp.write_text(vdf.dumps(data), encoding="utf-8")
+        shutil.copymode(path, tmp)
         os.replace(tmp, path)
