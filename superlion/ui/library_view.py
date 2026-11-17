@@ -504,6 +504,13 @@ class LibraryView(Adw.Bin):
             remove.add_css_class("flat")
             remove.connect("clicked", lambda _b, m=manager: self._remove_manager(m))
             row.add_suffix(launch)
+            game = None if manager.is_app else self.window.find_game(manager.shortcut_appid)
+            if game is not None:
+                cog = Gtk.Button(icon_name="emblem-system-symbolic", tooltip_text="Settings",
+                                 valign=Gtk.Align.CENTER)
+                cog.add_css_class("flat")
+                cog.connect("clicked", lambda _b, g=game: self.window.open_game(g))
+                row.add_suffix(cog)
             row.add_suffix(remove)
             group.add(row)
         add = Adw.ButtonRow(title="Add Linux Application…", start_icon_name="list-add-symbolic")
