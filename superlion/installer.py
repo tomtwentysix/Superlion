@@ -10,7 +10,7 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
-from . import appinfo, auth, vdf
+from . import appinfo, auth, downloads, vdf
 
 # UpdateRequired (2) and UpdateStarted (1024): Steam resumes the download on start.
 INSTALL_STATE = "1026"
@@ -76,3 +76,44 @@ def write_manifest(config, appid, library, name, installdir):
     tmp = path.with_suffix(".tmp")
     tmp.write_text(vdf.dumps(state), encoding="utf-8")
     os.replace(tmp, path)
+
+
+def started_flags(flags):
+    """State flags that make Steam start the update on launch; a pause bit would hold it."""
+    return (int(flags) | downloads.UPDATE_REQUIRED | downloads.UPDATE_STARTED) & ~downloads.UPDATE_PAUSED
+
+
+def find_manifest(config, appid):
+    for folder in config.library_folders():
+        path = manifest_path(folder, appid)
+        if path.exists():
+            return path
+    return None
+
+
+def read_auto_update(config, appid):
+    """AutoUpdateBehavior as Steam's string ("0" normal, "1" on launch, "2" high priority)."""
+    path = find_manifest(config, appid)
+    if path:
+        try:
+            return str(vdf.load(path).get("AppState", {}).get("AutoUpdateBehavior", "0"))
+        except OSError:
+            pass
+    return "0"
+
+
+def update_manifests(config, changes):
+    """Apply {appid: {"start_update"?, "auto_update"?}} to existing manifests. Steam must not be running."""
+    for appid, change in changes.items():
+        path = find_manifest(config, appid)
+        if not path:
+            continue
+        data = vdf.load(path)
+        state = data.setdefault("AppState", {})
+        if change.get("start_update"):
+            state["StateFlags"] = str(started_flags(state.get("StateFlags", 0)))
+        if "auto_update" in change:
+            state["AutoUpdateBehavior"] = str(change["auto_update"])
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(vdf.dumps(data), encoding="utf-8")
+        os.replace(tmp, path)

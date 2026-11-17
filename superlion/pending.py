@@ -99,8 +99,17 @@ def apply_now(config):
         if not queue[appid]:
             del queue[appid]
         _save(queue)
+    updates = {}
+    for appid, changes in queue.items():
+        update = {k: changes.pop(k) for k in ("start_update", "auto_update") if k in changes}
+        if update:
+            updates[appid] = update
+    if updates:
+        installer.update_manifests(config, updates)
+    queue = {a: c for a, c in queue.items() if c}
     if queue:
         steam_settings.write_changes(config, queue)
+    if updates or queue:
         _save({})
     return applied
 
