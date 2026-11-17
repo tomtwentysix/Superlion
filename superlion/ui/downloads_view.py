@@ -5,9 +5,11 @@ from gi.repository import Adw, GLib, Gtk
 from .. import auth, downloads, library, steam_control
 from . import images
 
+GROUP_BUTTONS = {"paused": "Resume All", "waiting": "Update All"}
+ROW_BUTTONS = {"paused": "Resume", "waiting": "Update Now"}
 GROUPS = {
     "downloading": ("Downloading", ""),
-    "paused": ("Paused", "Resume these in Steam."),
+    "paused": ("Paused", ""),
     "waiting": ("Updates Waiting", "Steam downloads these at the scheduled time, or when you play the game."),
 }
 VISIBLE_REFRESH = 2  # seconds while the section is open
@@ -43,11 +45,18 @@ class DownloadRow(Adw.ActionRow):
         self.add_prefix(Adw.Clamp(child=thumb, maximum_size=92, tightening_threshold=92, width_request=92))
         self.progress = Gtk.ProgressBar(valign=Gtk.Align.CENTER, width_request=160)
         self.add_suffix(self.progress)
+        self.start_button = Gtk.Button(valign=Gtk.Align.CENTER)
+        self.start_button.connect("clicked", lambda *_: window.start_updates([item.appid]))
+        self.add_suffix(self.start_button)
 
     def update(self, item, rate):
         self.set_subtitle(GLib.markup_escape_text(describe(item, rate)))
         self.progress.set_visible(item.status != "waiting")
         self.progress.set_fraction(item.fraction)
+        label = ROW_BUTTONS.get(item.status)
+        self.start_button.set_visible(bool(label))
+        if label:
+            self.start_button.set_label(label)
 
 
 class DownloadsView(Gtk.Box):
@@ -69,6 +78,10 @@ class DownloadsView(Gtk.Box):
         for status, (title, description) in GROUPS.items():
             group = Adw.PreferencesGroup(title=title, description=description, visible=False)
             self.groups[status] = group
+            if status in GROUP_BUTTONS:
+                button = Gtk.Button(label=GROUP_BUTTONS[status], valign=Gtk.Align.CENTER)
+                button.connect("clicked", self._on_start_all, status)
+                group.set_header_suffix(button)
             self.prefs.add(group)
         open_group = Adw.PreferencesGroup()
         check = Adw.ButtonRow(title="Check for Updates", start_icon_name="view-refresh-symbolic")
@@ -142,6 +155,11 @@ class DownloadsView(Gtk.Box):
             self.window.toast("Steam checks for updates while it runs. Updates it finds are listed here.")
         self.window.refresh_updates()
         self.refresh()
+
+    def _on_start_all(self, button, status):
+        appids = [appid for appid, s in self.rows if s == status]
+        if appids:
+            self.window.start_updates(appids)
 
     def _on_start_steam(self, banner):
         banner.set_revealed(False)

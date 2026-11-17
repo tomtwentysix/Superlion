@@ -924,9 +924,11 @@ class SuperlionWindow(Adw.ApplicationWindow):
         self.write_to_steam(queue, on_applied, parent, reload)
 
     def write_to_steam(self, queue, on_applied=None, parent=None, reload=False,
-                       saved_message="Settings saved", later_label="Apply When Steam Closes"):
+                       saved_message="Settings saved", later_label="Apply When Steam Closes",
+                       start=False):
         # queue() adds the changes to pending. Steam closed: write now. Steam running with no
         # games under it: restart it without asking. Otherwise ask, naming what would close.
+        # start: when Steam was closed, start it hidden after writing (a restart already does).
         if not steam_control.is_running(self.config):
             queue()
             try:
@@ -940,6 +942,8 @@ class SuperlionWindow(Adw.ApplicationWindow):
             self.library.refresh_sidebar()
             self.update_pending()
             self.toast(saved_message)
+            if start:
+                steam_control.start(self.config)
             if reload:
                 self.reload()
             return
@@ -984,6 +988,14 @@ class SuperlionWindow(Adw.ApplicationWindow):
 
         dialog.connect("response", on_response)
         dialog.present(parent or self)
+
+    def start_updates(self, appids):
+        def queue():
+            for appid in appids:
+                pending.add(appid, {"start_update": True})
+
+        self.write_to_steam(queue, saved_message="Starting updates",
+                            later_label="Update When Steam Closes", start=True)
 
     def remove_shortcut(self, game):
         appid, name = game.props.appid, game.props.name
