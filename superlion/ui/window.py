@@ -35,6 +35,14 @@ headerbar.hero-header.end-light windowcontrols.end button { color: rgba(0, 0, 0,
 """
 
 
+def will_close_text(names):
+    if len(names) > 1:
+        listed = ", ".join(names[:-1]) + " and " + names[-1]
+    else:
+        listed = names[0]
+    return f"{listed} will close if Steam restarts now."
+
+
 class SuperlionWindow(Adw.ApplicationWindow):
     def __init__(self, **kwargs):
         super().__init__(default_width=1100, default_height=760, title="Superlion", **kwargs)
@@ -717,44 +725,11 @@ class SuperlionWindow(Adw.ApplicationWindow):
         dialog.present(self)
 
     def sync_collections(self):
-        if not steam_control.is_running(self.config):
-            try:
-                pending.add_collections_sync()
-                pending.apply_now(self.config)
-            except (OSError, ValueError) as error:
-                self.toast(f"Collections could not be synced: {error}")
-                self.update_pending()
-                return
-            self.library.refresh_sidebar()
-            self.update_pending()
-            self.toast("Collections synced. Steam uploads them to Steam Cloud when it next starts.")
-            return
-
-        dialog = Adw.AlertDialog(
-            heading="Steam Must Be Closed",
-            body=(
-                "Steam keeps collections in memory and overwrites changes made while it is "
-                "running. Relaunch Steam now to sync them, or have them synced when Steam next closes."
-            ),
+        self.write_to_steam(
+            pending.add_collections_sync,
+            saved_message="Collections synced. Steam uploads them to Steam Cloud when it next starts.",
+            later_label="Sync When Steam Closes",
         )
-        dialog.add_response("cancel", "Cancel")
-        dialog.add_response("later", "Sync When Steam Closes")
-        dialog.add_response("relaunch", "Relaunch Steam Now")
-        dialog.set_response_appearance("relaunch", Adw.ResponseAppearance.SUGGESTED)
-        dialog.set_default_response("relaunch")
-        dialog.set_close_response("cancel")
-
-        def on_response(_dialog, response):
-            if response == "cancel":
-                return
-            pending.add_collections_sync()
-            if response == "relaunch":
-                self.relaunch_steam()
-            else:
-                self.update_pending()
-
-        dialog.connect("response", on_response)
-        dialog.present(self)
 
     def find_game(self, appid):
         store = self.library.store
@@ -944,32 +919,51 @@ class SuperlionWindow(Adw.ApplicationWindow):
             for appid, game_changes in changes.items():
                 pending.add(appid, game_changes)
 
+        self.write_to_steam(queue, on_applied, parent, reload)
+
+    def write_to_steam(self, queue, on_applied=None, parent=None, reload=False,
+                       saved_message="Settings saved", later_label="Apply When Steam Closes"):
+        # queue() adds the changes to pending. Steam closed: write now. Steam running with no
+        # games under it: restart it without asking. Otherwise ask, naming what would close.
         if not steam_control.is_running(self.config):
             queue()
             try:
                 pending.apply_now(self.config)
-            except OSError as error:
-                self.toast(f"The settings could not be saved: {error.strerror}")
+            except (OSError, ValueError) as error:
+                self.toast(f"The changes could not be saved: {getattr(error, 'strerror', None) or error}")
                 self.update_pending()
                 return
             if on_applied:
                 on_applied()
+            self.library.refresh_sidebar()
             self.update_pending()
-            self.toast("Settings saved")
+            self.toast(saved_message)
             if reload:
                 self.reload()
             return
 
+        running = steam_control.running_games()
+        if not running:
+            queue()
+            if on_applied:
+                on_applied()
+            self.toast("Restarting Steam to apply your changes")
+            self.relaunch_steam(reload=reload)
+            return
+
+        names = []
+        for appid in running:
+            game = self.find_game(appid)
+            names.append(game.props.name if game else "a game")
         dialog = Adw.AlertDialog(
             heading="Steam Must Be Closed",
             body=(
                 "Steam keeps these settings in memory and overwrites any changes made "
-                "while it is running. Relaunch Steam now to apply them, or have them "
-                "applied automatically when Steam next closes."
+                "while it is running. " + will_close_text(names)
             ),
         )
         dialog.add_response("cancel", "Cancel")
-        dialog.add_response("later", "Apply When Steam Closes")
+        dialog.add_response("later", later_label)
         dialog.add_response("relaunch", "Relaunch Steam Now")
         dialog.set_response_appearance("relaunch", Adw.ResponseAppearance.SUGGESTED)
         dialog.set_default_response("relaunch")
