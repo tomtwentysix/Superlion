@@ -45,6 +45,7 @@ class GameDetailsPage(Adw.NavigationPage):
         super().__init__(title=game.props.name)
         self.window = window
         self.game = game
+        self.is_manager = game.props.non_steam and game.props.appid in mod_managers.shortcut_ids()
 
         content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         content.append(self._build_hero())
@@ -243,12 +244,9 @@ class GameDetailsPage(Adw.NavigationPage):
     def _play_label(self):
         if not self.game.props.installed:
             return "Install"
-        if self._is_manager():
+        if self.is_manager:
             return "Launch"
         return "Update and Play" if self.game.props.update_available else "Play"
-
-    def _is_manager(self):
-        return self.game.props.non_steam and self.game.props.appid in mod_managers.shortcut_ids()
 
     def _set_running(self, running):
         if running == self.running:
@@ -485,17 +483,28 @@ class GameDetailsPage(Adw.NavigationPage):
                 subtitle="List this under Mod Managers instead of with your games",
                 active=game.props.appid in mod_managers.shortcut_ids(),
             )
-            manager_switch.connect(
-                "notify::active", lambda row, _p: self.window.set_mod_manager_shortcut(game, row.get_active())
-            )
+            manager_switch.connect("notify::active", self._on_manager_toggled)
             group.add(manager_switch)
-        if self._is_manager():
-            group.add(info_row("Used By", self._used_by()))
-        else:
-            group.add(self._build_mod_manager_link())
+        self.used_by_row = info_row("Used By", "")
+        group.add(self.used_by_row)
+        self.manager_link_row = self._build_mod_manager_link()
+        group.add(self.manager_link_row)
+        self._show_manager_rows()
         group.add(info_row("Last Played", format_last_played(game.props.last_played)))
         group.add(info_row("App ID", str(game.props.appid)))
         return group
+
+    def _on_manager_toggled(self, row, _pspec):
+        self.is_manager = row.get_active()
+        self.window.set_mod_manager_shortcut(self.game, self.is_manager)
+        self._show_manager_rows()
+        self._fill_actions()
+
+    def _show_manager_rows(self):
+        self.used_by_row.set_visible(self.is_manager)
+        self.manager_link_row.set_visible(not self.is_manager)
+        if self.is_manager:
+            self.used_by_row.set_subtitle(self._used_by())
 
     def _used_by(self):
         games = (self.window.find_game(appid) for appid in mod_managers.linked_games(f"shortcut:{self.game.props.appid}"))
@@ -545,13 +554,12 @@ class GameDetailsPage(Adw.NavigationPage):
         self.settings_group.add(self.tool_row)
 
         if "auto_update" in self.loaded:
-            self.auto_update_touched = False
             self.auto_update_row = Adw.SwitchRow(
                 title="Update Immediately",
                 subtitle="Download updates as soon as Steam finds them",
                 active=self.loaded["auto_update"] == "2",
             )
-            self.auto_update_row.connect("notify::active", self._on_auto_update_toggled)
+            self.auto_update_row.connect("notify::active", self._on_settings_edited)
             self.settings_group.add(self.auto_update_row)
 
         self.apply_row = Adw.ButtonRow(title="Apply", sensitive=False)
@@ -617,18 +625,13 @@ class GameDetailsPage(Adw.NavigationPage):
             "launch_options": self.launch_options.strip(),
             "compat_tool": self.tools[self.tool_row.get_selected()].name,
         }
-        if self.auto_update_row:
+        if self.auto_update_row is not None:
             if self.auto_update_row.get_active():
                 current["auto_update"] = "2"
             else:
-                # "1" (update on launch) is set in Steam and has no switch position.
-                keep = self.loaded["auto_update"] == "1" and not self.auto_update_touched
-                current["auto_update"] = "1" if keep else "0"
+                # Off means "not high priority"; Steam's update-on-launch ("1") is kept.
+                current["auto_update"] = "1" if self.loaded["auto_update"] == "1" else "0"
         return current
-
-    def _on_auto_update_toggled(self, *_):
-        self.auto_update_touched = True
-        self._on_settings_edited()
 
     def _changed_settings(self):
         current = self._current_settings()

@@ -958,14 +958,16 @@ class SuperlionWindow(Adw.ApplicationWindow):
             queue()
             if on_applied:
                 on_applied()
-            self.toast("Restarting Steam to apply your changes")
-            self.relaunch_steam(reload=reload)
+            self.relaunch_steam(reload=reload, message="Restarting Steam to apply your changes")
             return
 
-        names = []
-        for appid in running:
-            game = self.find_game(appid)
-            names.append(game.props.name if game else "a game")
+        games = [self.find_game(appid) for appid in running]
+        names = [game.props.name for game in games if game]
+        unknown = len(games) - len(names)
+        if unknown == 1:
+            names.append("another game" if names else "a game")
+        elif unknown:
+            names.append(f"{unknown} other games" if names else f"{unknown} games")
         dialog = Adw.AlertDialog(
             heading="Steam Must Be Closed",
             body=f"{reason} {will_close_text(names)}",
@@ -1015,6 +1017,7 @@ class SuperlionWindow(Adw.ApplicationWindow):
         def queue():
             pending.replace(appid, {"remove": True})
             mod_managers.remove(f"shortcut:{appid}")
+            mod_managers.link(appid, None)
             steam_match.clear_override(appid)
             game_collections.forget(appid)
 
@@ -1060,12 +1063,12 @@ class SuperlionWindow(Adw.ApplicationWindow):
 
         GLib.timeout_add_seconds(2, check)
 
-    def relaunch_steam(self, reload=False):
+    def relaunch_steam(self, reload=False, message="Closing Steam…"):
         if self._relaunching:
             return
         self._relaunching = True
         self.pending_banner.set_button_label("Relaunching…")
-        self.toast("Closing Steam…")
+        self.toast(message)
 
         def done(error):
             self._relaunching = False
