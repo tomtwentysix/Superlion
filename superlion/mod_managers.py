@@ -124,3 +124,7 @@ def link_counts():
     for manager_id in _load()["links"].values():
         counts[manager_id] = counts.get(manager_id, 0) + 1
     return counts
+
+
+def linked_games(manager_id):
+    return [appid for appid, linked_id in _load()["links"].items() if linked_id == manager_id]

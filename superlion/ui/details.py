@@ -242,7 +242,12 @@ class GameDetailsPage(Adw.NavigationPage):
     def _play_label(self):
         if not self.game.props.installed:
             return "Install"
+        if self._is_manager():
+            return "Launch"
         return "Update and Play" if self.game.props.update_available else "Play"
+
+    def _is_manager(self):
+        return self.game.props.non_steam and self.game.props.appid in mod_managers.shortcut_ids()
 
     def _set_running(self, running):
         if running == self.running:
@@ -483,11 +488,18 @@ class GameDetailsPage(Adw.NavigationPage):
                 "notify::active", lambda row, _p: self.window.set_mod_manager_shortcut(game, row.get_active())
             )
             group.add(manager_switch)
-        if not (game.props.non_steam and game.props.appid in mod_managers.shortcut_ids()):
+        if self._is_manager():
+            group.add(info_row("Used By", self._used_by()))
+        else:
             group.add(self._build_mod_manager_link())
         group.add(info_row("Last Played", format_last_played(game.props.last_played)))
         group.add(info_row("App ID", str(game.props.appid)))
         return group
+
+    def _used_by(self):
+        games = (self.window.find_game(appid) for appid in mod_managers.linked_games(f"shortcut:{self.game.props.appid}"))
+        names = sorted((g.props.name for g in games if g), key=str.casefold)
+        return ", ".join(names) or "No games"
 
     def _build_settings(self):
         appid = self.game.props.appid
