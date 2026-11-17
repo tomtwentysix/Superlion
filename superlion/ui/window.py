@@ -731,6 +731,7 @@ class SuperlionWindow(Adw.ApplicationWindow):
             pending.add_collections_sync,
             saved_message="Collections synced. Steam uploads them to Steam Cloud when it next starts.",
             later_label="Sync When Steam Closes",
+            reason="Steam keeps collections in memory and overwrites changes made while it is running.",
         )
 
     def find_game(self, appid):
@@ -878,7 +879,7 @@ class SuperlionWindow(Adw.ApplicationWindow):
         if wizard.result.start_steam:
             steam_control.start_if_needed(wizard.result)
 
-    def update_pending(self):
+    def update_pending(self, watch=True):
         count = pending.count()
         if count and pending.only_tools_waiting():
             self.pending_banner.set_title("Steam will find your changed Proton builds when it restarts")
@@ -887,14 +888,13 @@ class SuperlionWindow(Adw.ApplicationWindow):
                 f"{count} change{'s' if count != 1 else ''} will be written to Steam when it closes"
             )
         self.pending_banner.set_revealed(bool(count))
-        if count and not self._pending_watch:
+        if watch and count and not self._pending_watch:
             self._pending_watch = GLib.timeout_add_seconds(5, self._on_pending_watch)
 
     def _on_pending_watch(self):
         if self._relaunching:
             return GLib.SOURCE_CONTINUE
-        self._apply_pending_if_closed()
-        if pending.count():
+        if self._apply_pending_if_closed() and pending.count():
             return GLib.SOURCE_CONTINUE
         self._pending_watch = 0
         return GLib.SOURCE_REMOVE
@@ -902,13 +902,16 @@ class SuperlionWindow(Adw.ApplicationWindow):
     def _apply_pending_if_closed(self):
         try:
             applied = pending.apply_if_closed(self.config)
-        except OSError as error:
-            self.toast(f"Waiting settings could not be saved: {error.strerror}")
-            applied = 0
+        except Exception as error:  # A corrupt Steam file must not stop the library loading.
+            # Stop watching so the toast is not repeated; the next reload or change retries.
+            self.toast(f"Waiting changes could not be saved: {getattr(error, 'strerror', None) or error}")
+            self.update_pending(watch=False)
+            return False
         if applied:
             self.toast("Steam closed, so your waiting changes were written to Steam")
             self.library.refresh_sidebar()
         self.update_pending()
+        return True
 
     def apply_game_settings(self, appid, changes, on_applied=None, parent=None):
         # on_applied(changes) runs once they are saved or queued for when Steam closes.
@@ -925,7 +928,9 @@ class SuperlionWindow(Adw.ApplicationWindow):
 
     def write_to_steam(self, queue, on_applied=None, parent=None, reload=False,
                        saved_message="Settings saved", later_label="Apply When Steam Closes",
-                       start=False):
+                       start=False,
+                       reason="Steam keeps these settings in memory and overwrites any changes made "
+                              "while it is running."):
         # queue() adds the changes to pending. Steam closed: write now. Steam running with no
         # games under it: restart it without asking. Otherwise ask, naming what would close.
         # start: when Steam was closed, start it hidden after writing (a restart already does).
@@ -963,10 +968,7 @@ class SuperlionWindow(Adw.ApplicationWindow):
             names.append(game.props.name if game else "a game")
         dialog = Adw.AlertDialog(
             heading="Steam Must Be Closed",
-            body=(
-                "Steam keeps these settings in memory and overwrites any changes made "
-                "while it is running. " + will_close_text(names)
-            ),
+            body=f"{reason} {will_close_text(names)}",
         )
         dialog.add_response("cancel", "Cancel")
         dialog.add_response("later", later_label)
@@ -995,7 +997,8 @@ class SuperlionWindow(Adw.ApplicationWindow):
                 pending.add(appid, {"start_update": True})
 
         self.write_to_steam(queue, saved_message="Starting updates",
-                            later_label="Update When Steam Closes", start=True)
+                            later_label="Update When Steam Closes", start=True,
+                            reason="Steam only starts updates it finds when it launches.")
 
     def remove_shortcut(self, game):
         appid, name = game.props.appid, game.props.name
@@ -1028,7 +1031,10 @@ class SuperlionWindow(Adw.ApplicationWindow):
 
         def on_response(_dialog, response):
             if response == "remove":
-                self.write_to_steam(queue, applied, saved_message=f"{name} removed")
+                self.write_to_steam(
+                    queue, applied, saved_message=f"{name} removed",
+                    reason="Steam overwrites changes to its library made while it is running.",
+                )
 
         dialog.connect("response", on_response)
         dialog.present(self)

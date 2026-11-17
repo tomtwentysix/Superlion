@@ -110,8 +110,10 @@ def update_manifests(config, changes):
             continue
         data = vdf.load(path)
         state = data.setdefault("AppState", {})
-        if change.get("start_update"):
-            state["StateFlags"] = str(started_flags(state.get("StateFlags", 0)))
+        flags = int(state.get("StateFlags", 0))
+        # Steam may have finished the update since it was queued.
+        if change.get("start_update") and flags & (downloads.UPDATE_REQUIRED | downloads.UPDATE_PAUSED):
+            state["StateFlags"] = str(started_flags(flags))
         if "auto_update" in change:
             state["AutoUpdateBehavior"] = str(change["auto_update"])
         tmp = path.with_suffix(".tmp")
