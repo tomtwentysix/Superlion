@@ -112,14 +112,30 @@ def _write_atomic(path, data, binary=False):
         raise
 
 
+def remove_shortcuts(data, appids):
+    """Drop the matching entries from loaded shortcuts.vdf data and renumber the keys "0", "1", ... in order."""
+    entries = vdf.ensure_path(data, "shortcuts")
+    kept = [
+        e for _key, e in sorted(entries.items(), key=lambda kv: int(kv[0]) if kv[0].isdigit() else -1)
+        if not (isinstance(e, dict) and library.field(e, "appid") in appids)
+    ]
+    entries.clear()
+    entries.update({str(i): e for i, e in enumerate(kept)})
+    return data
+
+
 def write_changes(config, changes):
-    """Apply {appid: {"launch_options"?, "compat_tool"?, "name"?, "shortcut"?}}; "name" is for non-Steam games only."""
+    """Apply {appid: {"launch_options"?, "compat_tool"?, "name"?, "shortcut"?, "remove"?}}; "name" and "remove" are for non-Steam games only."""
     if config_mod.SCREENSHOTS:
         return
     launch = {a: c["launch_options"] for a, c in changes.items() if "launch_options" in c}
     compat = {a: c["compat_tool"] for a, c in changes.items() if "compat_tool" in c}
     names = {int(a): c["name"] for a, c in changes.items() if c.get("name")}
     added = [c["shortcut"] for c in changes.values() if "shortcut" in c]
+    removed = {int(a) for a, c in changes.items() if c.get("remove")}
+    launch = {a: o for a, o in launch.items() if int(a) not in removed}
+    compat = {a: t for a, t in compat.items() if int(a) not in removed}
+    names = {a: n for a, n in names.items() if a not in removed}
 
     if added:
         path = library.shortcuts_path(config)
@@ -137,6 +153,11 @@ def write_changes(config, changes):
         else:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(vdf.dumps_binary(data))
+
+    if removed:
+        path = library.shortcuts_path(config)
+        if path.is_file():
+            _write_atomic(path, remove_shortcuts(vdf.load_binary(path), removed), binary=True)
 
     shortcut_ids = set(library.read_shortcuts(config)) if (launch or names) else set()
     shortcut_launch = {int(a): o for a, o in launch.items() if int(a) in shortcut_ids}

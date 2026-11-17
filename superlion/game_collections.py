@@ -228,6 +228,23 @@ def set_member(collection_id, appid, member):
     _change(apply)
 
 
+def forget(appid):
+    """Take a game out of Superlion's collections and any queued edits to Steam's."""
+    store = _load_store()
+    changed = False
+    for c in store["collections"]:
+        if appid in c.appids:
+            c.appids.remove(appid)
+            changed = True
+    for edit in store["steam_edits"].values():
+        for key in ("added", "removed"):
+            if appid in edit.get(key, []):
+                edit[key].remove(appid)
+    if changed:
+        store["needs_sync"] = True
+    _save_store(store)
+
+
 def _new_steam_id():
     return "uc-" + "".join(secrets.choice(ID_ALPHABET) for _ in range(12))
 

@@ -351,6 +351,8 @@ class SuperlionWindow(Adw.ApplicationWindow):
         owned_ids = {int(e.get("appid", 0)) for e in self.owned_entries}
         entries = self.owned_entries + [e for e in self.family_entries if e["appid"] not in owned_ids]
         games = self.installed + owned.to_games(self.config, entries, installed_ids)
+        # Removals waiting for Steam to close are shown as if already written.
+        games = [g for g in games if not (g.props.non_steam and pending.get(g.props.appid).get("remove"))]
         library.apply_metadata(games, appinfo.load(self.config.root))
         GLib.idle_add(lambda: (self.downloads_view.refresh(), GLib.SOURCE_REMOVE)[-1])  # Covers show download state.
         for game in games:
@@ -982,6 +984,42 @@ class SuperlionWindow(Adw.ApplicationWindow):
 
         dialog.connect("response", on_response)
         dialog.present(parent or self)
+
+    def remove_shortcut(self, game):
+        appid, name = game.props.appid, game.props.name
+        dialog = Adw.AlertDialog(
+            heading="Remove from Library?",
+            body=f"Remove {name} from your Steam library? Its files and compatibility files are kept.",
+        )
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("remove", "Remove")
+        dialog.set_response_appearance("remove", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.set_default_response("cancel")
+        dialog.set_close_response("cancel")
+
+        def queue():
+            pending.replace(appid, {"remove": True})
+            mod_managers.remove(f"shortcut:{appid}")
+            steam_match.clear_override(appid)
+            game_collections.forget(appid)
+
+        def applied():
+            store = self.library.store
+            for i in range(store.get_n_items()):
+                if store.get_item(i) is game:
+                    store.remove(i)
+                    break
+            self.library.update_counts()
+            self.library.changed()
+            if getattr(self.nav.get_visible_page(), "game", None) is game:
+                self.nav.pop()
+
+        def on_response(_dialog, response):
+            if response == "remove":
+                self.write_to_steam(queue, applied, saved_message=f"{name} removed")
+
+        dialog.connect("response", on_response)
+        dialog.present(self)
 
     def install_game(self, appid, name=""):
         install_game(self, appid, name)

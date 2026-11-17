@@ -40,6 +40,13 @@ def add(appid, changes):
     _save(queue)
 
 
+def replace(appid, changes):
+    """Queue changes for a game in place of everything already queued for it."""
+    queue = load()
+    queue[int(appid)] = changes
+    _save(queue)
+
+
 def get(appid):
     return load().get(int(appid), {})
 

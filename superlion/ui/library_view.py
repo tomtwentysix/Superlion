@@ -239,6 +239,11 @@ def game_menu(window, game, page=None):
         removal.append("Uninstall…", "game.uninstall")
         action("uninstall", lambda: window.uninstall_game(game))
         menu.append_section(None, removal)
+    elif game.props.non_steam:
+        removal = Gio.Menu()
+        removal.append("Remove from Library…", "game.remove")
+        action("remove", lambda: window.remove_shortcut(game))
+        menu.append_section(None, removal)
     return menu, actions
 
 
