@@ -3,7 +3,8 @@
 from gi.repository import Adw, Gio, GLib, Gtk
 
 from .. import (
-    auth, downloads, library, mod_managers, owned, pending, steam_control, steam_settings, store_api,
+    auth, downloads, installer, library, mod_managers, owned, pending, steam_control, steam_settings,
+    store_api,
 )
 from . import images
 from .. import launch_options as lo
@@ -516,6 +517,9 @@ class GameDetailsPage(Adw.NavigationPage):
             "launch_options": queued.get("launch_options", saved_options),
             "compat_tool": queued.get("compat_tool", saved_tool),
         }
+        self.auto_update_row = None
+        if self.game.props.installed and not self.game.props.non_steam:
+            self.loaded["auto_update"] = queued.get("auto_update") or installer.read_auto_update(config, appid)
         if self.loaded["compat_tool"] not in {t.name for t in self.tools}:
             # Keep a mapping Superlion does not recognise rather than discarding it.
             name = self.loaded["compat_tool"]
@@ -539,6 +543,16 @@ class GameDetailsPage(Adw.NavigationPage):
         self.tool_row.set_selected(names.index(self.loaded["compat_tool"]))
         self.tool_row.connect("notify::selected", self._on_settings_edited)
         self.settings_group.add(self.tool_row)
+
+        if "auto_update" in self.loaded:
+            self.auto_update_touched = False
+            self.auto_update_row = Adw.SwitchRow(
+                title="Update Immediately",
+                subtitle="Download updates as soon as Steam finds them",
+                active=self.loaded["auto_update"] == "2",
+            )
+            self.auto_update_row.connect("notify::active", self._on_auto_update_toggled)
+            self.settings_group.add(self.auto_update_row)
 
         self.apply_row = Adw.ButtonRow(title="Apply", sensitive=False)
         self.apply_row.add_css_class("suggested-action")
@@ -599,10 +613,22 @@ class GameDetailsPage(Adw.NavigationPage):
         self.settings_group.set_description(text)
 
     def _current_settings(self):
-        return {
+        current = {
             "launch_options": self.launch_options.strip(),
             "compat_tool": self.tools[self.tool_row.get_selected()].name,
         }
+        if self.auto_update_row:
+            if self.auto_update_row.get_active():
+                current["auto_update"] = "2"
+            else:
+                # "1" (update on launch) is set in Steam and has no switch position.
+                keep = self.loaded["auto_update"] == "1" and not self.auto_update_touched
+                current["auto_update"] = "1" if keep else "0"
+        return current
+
+    def _on_auto_update_toggled(self, *_):
+        self.auto_update_touched = True
+        self._on_settings_edited()
 
     def _changed_settings(self):
         current = self._current_settings()
