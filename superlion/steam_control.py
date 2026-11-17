@@ -54,7 +54,7 @@ def _spawn(config, *args):
 
 
 # Links that do their work without Steam's window, such as starting a game.
-BACKGROUND_LINKS = ("steam://rungameid/", "steam://run/", "steam://launch/")
+BACKGROUND_LINKS = ("steam://rungameid/", "steam://run/", "steam://launch/", "steam://uninstall/")
 
 
 def open_uri(config, uri):

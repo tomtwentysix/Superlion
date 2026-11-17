@@ -234,6 +234,11 @@ def game_menu(window, game, page=None):
     visibility.append("Unhide Game" if hidden else "Hide Game", "game.hide")
     action("hide", lambda: window.set_hidden(game, not hidden))
     menu.append_section(None, visibility)
+    if installed and not game.props.non_steam:
+        removal = Gio.Menu()
+        removal.append("Uninstall…", "game.uninstall")
+        action("uninstall", lambda: window.uninstall_game(game))
+        menu.append_section(None, removal)
     return menu, actions
 
 

@@ -3,7 +3,7 @@
 from gi.repository import Adw, Gio, GLib, GObject, Gtk
 
 from .. import (
-    appinfo, auth, game_collections, library, mod_managers, owned, pending, steam_control, steam_match,
+    appinfo, auth, game_collections, installer, library, mod_managers, owned, pending, steam_control, steam_match,
     steam_settings, sunshine,
 )
 from .. import config as config_mod
@@ -985,6 +985,24 @@ class SuperlionWindow(Adw.ApplicationWindow):
 
     def install_game(self, appid, name=""):
         install_game(self, appid, name)
+
+    def uninstall_game(self, game):
+        appid, name = game.props.appid, game.props.name
+        self.launch(f"steam://uninstall/{appid}", "Opening Steam's uninstall dialog")
+        waited = 0
+
+        def check():
+            nonlocal waited
+            waited += 2
+            if installer.is_installed_anywhere(self.config, appid):
+                return waited < 60
+            if getattr(self.nav.get_visible_page(), "game", None) is game:
+                self.nav.pop()
+            self.reload()
+            self.toast(f"{name} uninstalled")
+            return GLib.SOURCE_REMOVE
+
+        GLib.timeout_add_seconds(2, check)
 
     def relaunch_steam(self, reload=False):
         if self._relaunching:
