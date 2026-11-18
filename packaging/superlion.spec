@@ -1,5 +1,5 @@
 Name:           superlion
-Version:        0.10.0
+Version:        0.10.1
 Release:        1%{?dist}
 Summary:        Native Linux app for your Steam library
 License:        GPL-3.0-or-later
@@ -65,6 +65,9 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/uk.co.solarflareit.Su
 %{_datadir}/dnf5/repos.override.d/50-superlion.repo
 
 %changelog
+* Wed Nov 18 2026 Tom <tom@solarflareit.co.uk> - 0.10.1-1
+- Update Now and Update All start the update as soon as Steam signs in, rather than waiting for its scheduled time.
+
 * Tue Nov 17 2026 Tom <tom@solarflareit.co.uk> - 0.10.0-1
 - Uninstall Steam games from a game's page or the library, through Steam's own confirmation and without its main window.
 - Remove non-Steam games, mod managers included, from the library.
