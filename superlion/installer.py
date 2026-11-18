@@ -114,6 +114,8 @@ def update_manifests(config, changes):
         # Steam may have finished the update since it was queued.
         if change.get("start_update") and flags & (downloads.UPDATE_REQUIRED | downloads.UPDATE_PAUSED):
             state["StateFlags"] = str(started_flags(flags))
+            # Steam's scheduler ignores the flags until this time passes; 0 means now.
+            state["ScheduledAutoUpdate"] = "0"
         if "auto_update" in change:
             state["AutoUpdateBehavior"] = str(change["auto_update"])
         tmp = path.with_suffix(".tmp")
