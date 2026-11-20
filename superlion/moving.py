@@ -307,6 +307,7 @@ def suggest_folder(entries, appid, blocked, home=None, is_mount=os.path.ismount,
     def container(candidate):
         return (
             candidate == home
+            or len(candidate.parts) <= 2  # / and folders such as /opt
             or is_mount(candidate)
             or candidate in keep
             or candidate.name.startswith(".")

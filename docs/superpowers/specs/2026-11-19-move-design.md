@@ -56,8 +56,11 @@ closed, from `/mnt/ssd/SteamLibrary` to `~/.local/share/Steam` (across drives, 6
 - It ran a 990 MB shader download, which it also ran the day before with no move, so that is
   the game's normal shader refresh.
 
-Not yet tested: Workshop content, and deleting a game while Steam is closed (bulk Uninstall).
-The plan starts with a test of the latter on a small game Tom picks.
+Deleting (20 November 2026): Sonic Adventure DX (71250) was deleted with Steam closed, manifest
+first, then its folder, prefix and shader cache. Steam started with `-silent` logged nothing for
+it, dropped it from `libraryfolders.vdf` itself and recreated nothing.
+
+Not yet tested: Workshop content.
 
 ## Approaches
 
