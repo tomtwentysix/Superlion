@@ -126,6 +126,8 @@ def remove_shortcuts(data, appids):
 
 def rewrite_shortcut_paths(config, moves):
     """Apply {appid: (old_folder, new_folder)} to the matching shortcuts' paths."""
+    if config_mod.SCREENSHOTS:
+        return
     path = library.shortcuts_path(config)
     data = vdf.load_binary(path)
     entries = vdf.ensure_path(data, "shortcuts")

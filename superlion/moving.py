@@ -266,7 +266,7 @@ def suggest_folder(entries, appid, blocked, home=None, is_mount=os.path.ismount)
             folder != home
             and folder != folder.parent
             and not is_mount(folder)
-            and not any(folder.is_relative_to(b) for b in blocked)
+            and not any(folder.is_relative_to(b) or b.is_relative_to(folder) for b in blocked)
             and not any(e.is_relative_to(folder) for e in outside)
         )
 
