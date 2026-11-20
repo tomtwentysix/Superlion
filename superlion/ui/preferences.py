@@ -130,6 +130,7 @@ class PreferencesDialog(Adw.PreferencesDialog):
             subtitle="Used for buying, the cart and the wishlist, and by the key page inside Superlion.",
         )
         sign_out = Gtk.Button(label="Sign Out", valign=Gtk.Align.CENTER)
+        sign_out.add_css_class("destructive-action")
         sign_out.connect("clicked", lambda *_: (clear_sign_in(), self.window.toast("Signed out of the Steam store")))
         website.add_suffix(sign_out)
         group.add(website)
