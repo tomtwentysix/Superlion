@@ -102,10 +102,10 @@ def steam_job(game, dest):
 def choose_library(window, games, on_chosen):
     # Measured rather than taken from SizeOnDisk, which some games leave far too low (Star Trek
     # Online's launcher downloads 23 GB that Steam never counts).
-    parts = [moving.steam_parts(g.props.library, g.props.appid, Path(g.props.install_dir).name) for g in games]
+    found = [(g.props.library, g.props.appid, Path(g.props.install_dir).name) for g in games]
 
     def measure():
-        return [moving.parts_size(p) for p in parts]
+        return [moving.parts_size(moving.steam_parts(*game)) for game in found]
 
     def done(sizes, error):
         if error:

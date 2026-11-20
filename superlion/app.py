@@ -21,6 +21,7 @@ DEVELOPER = "SolarFlare Developments"
 class SuperlionApplication(Adw.Application):
     def __init__(self):
         super().__init__(application_id=config_mod.APP_ID, flags=Gio.ApplicationFlags.HANDLES_OPEN)
+        self._gc_ticks = 0
         self._add_action("quit", self._on_quit, ["<primary>q"])
         self._add_action("about", self._on_about)
         self._add_action("dedication", self._on_dedication)
@@ -45,8 +46,11 @@ class SuperlionApplication(Adw.Application):
         Gtk.Window.set_default_icon_name(config_mod.ICON_NAME)
 
     def _collect_garbage(self):
-        if any(count > limit for count, limit in zip(gc.get_count(), gc.get_threshold())):
+        self._gc_ticks += 1
+        if self._gc_ticks % 60 == 0:
             gc.collect()
+        elif gc.get_count()[0] > gc.get_threshold()[0]:
+            gc.collect(0)
         return GLib.SOURCE_CONTINUE
 
     def do_activate(self):
