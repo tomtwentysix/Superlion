@@ -7,6 +7,7 @@ from gi.repository import Adw, Gio, GLib, Gtk
 
 from .. import game_collections, library, moving, steam_settings
 from . import move_dialog
+from .mover import Job
 from .wizard import short_path
 
 
@@ -52,6 +53,7 @@ class LibraryFolderPage(Adw.NavigationPage):
         self.action_bar.pack_end(move)
         self.uninstall_button = Gtk.Button(label="Uninstall…")
         self.uninstall_button.add_css_class("destructive-action")
+        self.uninstall_button.connect("clicked", lambda *_: self._uninstall())
         self.action_bar.pack_end(self.uninstall_button)
 
         bottom = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -202,6 +204,40 @@ class LibraryFolderPage(Adw.NavigationPage):
             self.window.mover.start([move_dialog.steam_job(game, dest) for game in games], self, "Move")
 
         move_dialog.choose_library(self.window, games, chosen)
+
+    def _uninstall(self):
+        games = self.chosen()
+        size = GLib.format_size(sum(game.props.size for game in games))
+        if len(games) == 1:
+            heading, what = f"Uninstall {games[0].props.name}?", games[0].props.name
+        else:
+            heading, what = f"Uninstall {len(games)} Games?", "\n".join(game.props.name for game in games)
+        dialog = Adw.AlertDialog(
+            heading=heading,
+            body=f"{what}\n\nThis frees {size}. Saves kept only in the games' compatibility files are deleted too.",
+        )
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("uninstall", "Uninstall")
+        dialog.set_response_appearance("uninstall", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.set_close_response("cancel")
+
+        def on_response(_dialog, response):
+            if response != "uninstall":
+                return
+            self._clear()
+            self.window.mover.start([self._uninstall_job(game) for game in games], self, "Uninstall")
+
+        dialog.connect("response", on_response)
+        dialog.present(self)
+
+    def _uninstall_job(self, game):
+        library_path, appid = Path(game.props.library), game.props.appid
+        installdir = Path(game.props.install_dir).name
+        return Job(
+            "uninstall", game.props.name,
+            lambda progress: moving.delete_steam_game(library_path, appid, installdir, progress),
+            game.props.size, appids=[appid],
+        )
 
     def _hide(self):
         self.window.hide_games(self.chosen())
