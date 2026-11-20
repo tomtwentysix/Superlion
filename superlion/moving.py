@@ -11,8 +11,11 @@ from . import library as library_mod
 from . import vdf
 
 CHUNK = 1024 * 1024
-# Folders a game keeps its executables in, below the game's own folder.
-BIN_FOLDERS = {"bin", "bin32", "bin64", "binaries", "system", "win32", "win64", "x64", "x86", "x86_64"}
+# Folders that hold games rather than being one, so a suggestion stops below them.
+CONTAINERS = {
+    "games", "heroic", "gog games", "lutris", "bottles", "wine", "program files",
+    "program files (x86)", "drive_c", "steamlibrary", "steamapps", "common",
+}
 
 
 class MoveError(Exception):
@@ -301,12 +304,16 @@ def suggest_folder(entries, appid, blocked, home=None, is_mount=os.path.ismount,
     folder = exe.parent
     if not allowed(folder):
         return None
-    # A folder straight under home, a drive or a kept folder, such as ~/Games, usually holds
-    # more than one game, so it is only climbed to out of a folder like bin.
-    def top_level(candidate):
-        return candidate.parent == home or is_mount(candidate.parent) or candidate.parent in keep
+    def container(candidate):
+        return (
+            candidate == home
+            or is_mount(candidate)
+            or candidate in keep
+            or candidate.name.startswith(".")
+            or candidate.name.lower() in CONTAINERS
+        )
 
-    while allowed(folder.parent) and (folder.name.lower() in BIN_FOLDERS or not top_level(folder.parent)):
+    while allowed(folder.parent) and not container(folder.parent):
         folder = folder.parent
     return folder, sorted(group - {appid})
 

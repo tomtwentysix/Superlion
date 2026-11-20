@@ -374,10 +374,11 @@ def show_folder_status(row, folder):
     return update
 
 
-def library_groups(add_group, state, get_parent, on_rescan=None, show_games=None, held=None):
+def library_groups(add_group, state, get_parent, on_rescan=None, show_games=None, held=None, relaunching=None):
     # Returns collect(state), which writes the choices into state and returns True
     # if a folder was removed from Steam, which changes Steam's files but not state.
     # held() returns why Steam's files cannot be changed now, if they cannot.
+    # relaunching(flag) tells the window a Steam relaunch has started or ended.
     group = Adw.PreferencesGroup(
         title="Library Folders", description="Games in folders that are turned off are hidden."
     )
@@ -453,7 +454,12 @@ def library_groups(add_group, state, get_parent, on_rescan=None, show_games=None
             rescan()
 
         if running:
-            steam_control.relaunch(state, lambda: steam_paths.unregister_library(state.steam_root, folder), done)
+            def finished(error):
+                relaunching and relaunching(False)
+                done(error)
+
+            relaunching and relaunching(True)
+            steam_control.relaunch(state, lambda: steam_paths.unregister_library(state.steam_root, folder), finished)
             return
         try:
             steam_paths.unregister_library(state.steam_root, folder)

@@ -627,14 +627,14 @@ class SuperlionWindow(Adw.ApplicationWindow):
 
     def set_hidden(self, game, hidden):
         game_collections.set_steam_member("hidden", game.props.appid, hidden)
-        self.queue_steam_sync()
+        self.queue_steam_sync(quiet=True)
         self._collections_changed()
         self.toast(f"{game.props.name} {'hidden' if hidden else 'shown again'}")
 
     def hide_games(self, games):
         for game in games:
             game_collections.set_steam_member("hidden", game.props.appid, True)
-        self.queue_steam_sync()
+        self.queue_steam_sync(quiet=True)
         self._collections_changed()
         self.toast(f"{games[0].props.name} hidden" if len(games) == 1 else f"{len(games)} games hidden")
 
@@ -648,7 +648,7 @@ class SuperlionWindow(Adw.ApplicationWindow):
             else:
                 game_collections.set_member(collection_id, game.props.appid, True)
         if collection.source == "steam":
-            self.queue_steam_sync()
+            self.queue_steam_sync(quiet=True)
         self._collections_changed()
         what = games[0].props.name if len(games) == 1 else f"{len(games)} games"
         self.toast(f"{what} added to “{collection.name}”")
@@ -658,10 +658,10 @@ class SuperlionWindow(Adw.ApplicationWindow):
         self.queue_steam_sync()
         self._collections_changed()
 
-    def queue_steam_sync(self):
+    def queue_steam_sync(self, quiet=False):
         # Unlike sync_collections, this never sends Superlion's own collections and never asks.
         pending.add_collections_sync(include_own=False)
-        if self._hold_for_mover():
+        if self._hold_for_mover(quiet):
             return
         if steam_control.is_running(self.config):
             self.update_pending()
@@ -938,11 +938,12 @@ class SuperlionWindow(Adw.ApplicationWindow):
                 self.toast(f"Steam can be started once the {self.mover.what} finishes")
         return self.moving
 
-    def _hold_for_mover(self):
+    def _hold_for_mover(self, quiet=False):
         # Steam is closed during a move, but its files must not change until the move finishes.
         if self.moving:
             self.update_pending(watch=False)
-            self.toast(f"Saved. Steam gets this when the {self.mover.what} finishes.")
+            if not quiet:
+                self.toast(f"Saved. Steam gets this when the {self.mover.what} finishes.")
         return self.moving
 
     def ask_quit(self):
@@ -950,17 +951,19 @@ class SuperlionWindow(Adw.ApplicationWindow):
         if self.mover.what == "move" and several:
             heading = "Games Are Being Moved"
             body = ("Quitting stops after the game being moved now. If it is still being copied, it stays "
-                    "where it was. Games already moved stay in their new library.")
+                    "where it was. Games already moved stay in their new library. If Steam has not yet closed, "
+                    "nothing is moved.")
         elif self.mover.what == "move":
             heading = "A Game Is Being Moved"
             body = ("If it is still being copied, quitting stops the copy and it stays where it was. "
-                    "Otherwise the move finishes first.")
+                    "If Steam has not yet closed, nothing is moved. Otherwise the move finishes first.")
         elif several:
             heading = "Games Are Being Uninstalled"
-            body = "Quitting stops once the game being uninstalled now is removed. The rest stay installed."
+            body = ("Quitting stops once the game being uninstalled now is removed. The rest stay installed. "
+                    "If Steam has not yet closed, nothing is removed.")
         else:
             heading = "A Game Is Being Uninstalled"
-            body = "Superlion quits once it is removed."
+            body = "Superlion quits once the game is removed. If Steam has not yet closed, nothing is removed."
         dialog = Adw.AlertDialog(heading=heading, body=body)
         dialog.add_response("cancel", "Cancel")
         dialog.add_response("quit", "Quit")
