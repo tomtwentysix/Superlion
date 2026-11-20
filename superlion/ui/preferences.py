@@ -7,6 +7,7 @@ from gi.repository import Adw, Gtk
 from .. import config as config_mod
 from .. import sgdb, shortcuts, steam_paths
 from .launch_options_prefs import LaunchOptionsPage
+from .library_folder_page import LibraryFolderPage
 from .proton_manager import ProtonGroup
 from .sgdb_setup import SgdbKeySetup
 from .sunshine_status import StreamOptions, SunshineGroup
@@ -31,7 +32,10 @@ class PreferencesDialog(Adw.PreferencesDialog):
             steam.add(self._build_files_group())
         steam.add(ProtonGroup(self, window))
         self.account = account_choice(steam.add, self.state)
-        self.collect_libraries = library_groups(steam.add, self.state, lambda: self, window.update_setup_banner)
+        self.collect_libraries = library_groups(
+            steam.add, self.state, lambda: self, window.update_setup_banner,
+            show_games=lambda folder: self.push_subpage(LibraryFolderPage(window, folder)),
+        )
         self.add(steam)
 
         streaming = Adw.PreferencesPage(title="Streaming", icon_name="tv-symbolic")

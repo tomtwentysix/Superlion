@@ -631,6 +631,28 @@ class SuperlionWindow(Adw.ApplicationWindow):
         self._collections_changed()
         self.toast(f"{game.props.name} {'hidden' if hidden else 'shown again'}")
 
+    def hide_games(self, games):
+        for game in games:
+            game_collections.set_steam_member("hidden", game.props.appid, True)
+        self.queue_steam_sync()
+        self._collections_changed()
+        self.toast(f"{games[0].props.name} hidden" if len(games) == 1 else f"{len(games)} games hidden")
+
+    def add_games_to_collection(self, games, collection_id):
+        collection = self.library.collections.get(collection_id)
+        if collection is None:
+            return
+        for game in games:
+            if collection.source == "steam":
+                game_collections.set_steam_member(collection.steam_id, game.props.appid, True)
+            else:
+                game_collections.set_member(collection_id, game.props.appid, True)
+        if collection.source == "steam":
+            self.queue_steam_sync()
+        self._collections_changed()
+        what = games[0].props.name if len(games) == 1 else f"{len(games)} games"
+        self.toast(f"{what} added to “{collection.name}”")
+
     def set_favourite(self, game, favourite):
         game_collections.set_steam_member("favorite", game.props.appid, favourite)
         self.queue_steam_sync()

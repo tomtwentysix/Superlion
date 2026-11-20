@@ -374,7 +374,7 @@ def show_folder_status(row, folder):
     return update
 
 
-def library_groups(add_group, state, get_parent, on_rescan=None):
+def library_groups(add_group, state, get_parent, on_rescan=None, show_games=None):
     # Returns collect(state), which writes the choices into state and returns True
     # if a folder was removed from Steam, which changes Steam's files but not state.
     group = Adw.PreferencesGroup(
@@ -390,6 +390,13 @@ def library_groups(add_group, state, get_parent, on_rescan=None):
     switches = {}
     disabled = set(state.disabled_libraries)
     removed = []
+
+    def add_show_games(row, folder):
+        if show_games:
+            button = Gtk.Button(icon_name="go-next-symbolic", tooltip_text="Show Games", valign=Gtk.Align.CENTER)
+            button.add_css_class("flat")
+            button.connect("clicked", lambda *_: show_games(Path(folder)))
+            row.add_suffix(button)
 
     def fill_steam():
         for path, row in switches.items():
@@ -410,6 +417,7 @@ def library_groups(add_group, state, get_parent, on_rescan=None):
                 remove.add_css_class("flat")
                 remove.connect("clicked", lambda _b, f=folder: confirm_unregister(f))
                 row.add_suffix(remove)
+            add_show_games(row, folder)
             switches[str(folder)] = row
             group.add(row)
         group.add(steam_error)
@@ -471,6 +479,7 @@ def library_groups(add_group, state, get_parent, on_rescan=None):
 
         remove.connect("clicked", on_remove)
         row.add_suffix(remove)
+        add_show_games(row, path)
         rows[path] = row
         extra_group.add(row)
 

@@ -28,7 +28,7 @@ def _blocked(config):
     return [folder / "steamapps" for folder in folders]
 
 
-def _blocker(window, game):
+def blocker(window, game):
     config, appid = window.config, game.props.appid
     if window.moving:
         return f"Wait until the {window.mover.what} under way finishes."
@@ -71,7 +71,7 @@ def _alert(parent, heading, body):
 
 
 def move_game(window, game):
-    reason = _blocker(window, game)
+    reason = blocker(window, game)
     if reason:
         _alert(window, f"{game.props.name} Cannot Be Moved", reason)
     elif game.props.non_steam:
