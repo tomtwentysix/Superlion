@@ -3,7 +3,7 @@
 from gi.repository import Adw, Gio, GLib, Gtk, Pango
 
 from .. import downloads, game_collections, library, mod_managers, owned, sunshine
-from . import images
+from . import images, move_dialog
 
 COVER_W, COVER_H = 150, 225
 GROUP_TITLES = {"genre": "Genre", "year": "Release Year", "installed": "Installed"}
@@ -234,16 +234,22 @@ def game_menu(window, game, page=None):
     visibility.append("Unhide Game" if hidden else "Hide Game", "game.hide")
     action("hide", lambda: window.set_hidden(game, not hidden))
     menu.append_section(None, visibility)
-    if installed and not game.props.non_steam:
+    if installed or game.props.non_steam:
         removal = Gio.Menu()
-        removal.append("Uninstall…", "game.uninstall")
-        action("uninstall", lambda: window.uninstall_game(game))
+        if installed:
+            removal.append("Move…", "game.move")
+            action("move", lambda: move_dialog.move_game(window, game))
+        if game.props.non_steam:
+            removal.append("Remove from Library…", "game.remove")
+            action("remove", lambda: window.remove_shortcut(game))
+        else:
+            removal.append("Uninstall…", "game.uninstall")
+            action("uninstall", lambda: window.uninstall_game(game))
         menu.append_section(None, removal)
-    elif game.props.non_steam:
-        removal = Gio.Menu()
-        removal.append("Remove from Library…", "game.remove")
-        action("remove", lambda: window.remove_shortcut(game))
-        menu.append_section(None, removal)
+    if window.mover.busy_with(appid):
+        for key in ("play", "move", "uninstall", "remove"):
+            if act := actions.lookup_action(key):
+                act.set_enabled(False)
     return menu, actions
 
 

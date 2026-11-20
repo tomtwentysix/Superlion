@@ -6,7 +6,7 @@ from .. import (
     auth, downloads, installer, library, mod_managers, owned, pending, steam_control, steam_settings,
     store_api,
 )
-from . import images
+from . import images, move_dialog
 from .. import launch_options as lo
 from .artwork_picker import choose_file
 from .launch_options_editor import LaunchOptionsEditor, describe_warning
@@ -61,6 +61,7 @@ class GameDetailsPage(Adw.NavigationPage):
         body.append(self._build_actions())
         body.append(self._build_warnings_note())
         body.append(self._build_download_progress())
+        body.append(self._build_move_progress())
 
         overview = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=24)
         self.store_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=24)
@@ -198,6 +199,54 @@ class GameDetailsPage(Adw.NavigationPage):
         self.download_area.append(self.download_text)
         return self.download_area
 
+    def _build_move_progress(self):
+        mover = self.window.mover
+        moving = mover.busy_with(self.game.props.appid)
+        self.move_area = Gtk.Box(
+            orientation=Gtk.Orientation.VERTICAL, spacing=6, visible=moving, halign=Gtk.Align.CENTER,
+            width_request=360,
+        )
+        self.move_bar = Gtk.ProgressBar()
+        self.move_text = Gtk.Label(wrap=True, justify=Gtk.Justification.CENTER)
+        self.move_text.add_css_class("caption")
+        self.move_text.add_css_class("dim-label")
+        self.move_area.append(self.move_bar)
+        self.move_area.append(self.move_text)
+        self._mover_handlers = [
+            mover.connect("progress", self._on_move_progress),
+            mover.connect("finished", self._on_move_finished),
+        ]
+        return self.move_area
+
+    def _on_move_progress(self, mover, label, done, total):
+        if not mover.busy_with(self.game.props.appid):
+            return
+        self.move_area.set_visible(True)
+        self.primary.set_sensitive(False)
+        self.move_bar.set_fraction(done / total if total else 0)
+        self.move_text.set_label(move_dialog.progress_text(mover, label, done, total))
+
+    def _on_move_finished(self, mover, _failures):
+        appid = self.game.props.appid
+        if not any(appid in job.appids for job in mover.jobs):
+            return
+        self.move_area.set_visible(False)
+        self.primary.set_sensitive(True)
+        nav = self.window.nav
+        if nav.get_visible_page() is not self or not any(appid in job.appids for job in mover.succeeded):
+            return
+        # The reload made new Game objects; this page still shows the old folders.
+        game = self.window.find_game(appid)
+        if game is self.game:
+            return
+        self.release()
+        if game is None:
+            nav.pop()
+            return
+        stack = nav.get_navigation_stack()
+        pages = [stack.get_item(i) for i in range(stack.get_n_items() - 1)]
+        nav.replace(pages + [GameDetailsPage(self.window, game)])
+
     def _watch_downloads(self):
         self._check_download()
         self._download_timer = GLib.timeout_add_seconds(2, self._check_download)
@@ -217,7 +266,7 @@ class GameDetailsPage(Adw.NavigationPage):
         return GLib.SOURCE_CONTINUE
 
     def _show_download(self, result, error):
-        if error or not result:
+        if error or not result or self.window.mover.busy_with(self.game.props.appid):
             return
         item, rate, running = result
         self._set_running(running and self.game.props.installed)
@@ -287,6 +336,9 @@ class GameDetailsPage(Adw.NavigationPage):
         for handler in self._handlers:
             self.game.disconnect(handler)
         self._handlers = []
+        for handler in self._mover_handlers:
+            self.window.mover.disconnect(handler)
+        self._mover_handlers = []
         if self.media:
             self.media.stop()
 
@@ -418,6 +470,7 @@ class GameDetailsPage(Adw.NavigationPage):
         hover.connect("enter", lambda *_: self._on_primary_hover(True))
         hover.connect("leave", lambda *_: self._on_primary_hover(False))
         primary.add_controller(hover)
+        primary.set_sensitive(not self.window.mover.busy_with(game.props.appid))
         manager = mod_managers.linked(game.props.appid)
         if manager is not None:
             box.append(self._pill(
