@@ -20,7 +20,7 @@ DEVELOPER = "SolarFlare Developments"
 class SuperlionApplication(Adw.Application):
     def __init__(self):
         super().__init__(application_id=config_mod.APP_ID, flags=Gio.ApplicationFlags.HANDLES_OPEN)
-        self._add_action("quit", lambda *_: self.quit(), ["<primary>q"])
+        self._add_action("quit", self._on_quit, ["<primary>q"])
         self._add_action("about", self._on_about)
         self._add_action("dedication", self._on_dedication)
         self._add_action("preferences", self._on_preferences, ["<primary>comma"])
@@ -62,6 +62,13 @@ class SuperlionApplication(Adw.Application):
             self.props.active_window.add_to_steam(paths)
         else:
             self.props.active_window.toast("Only files on this computer can be added to Steam")
+
+    def _on_quit(self, *_):
+        window = next((w for w in self.get_windows() if getattr(w, "moving", False)), None)
+        if window:
+            window.ask_quit()
+        else:
+            self.quit()
 
     def _on_preferences(self, *_):
         window = self.props.active_window

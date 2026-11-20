@@ -14,6 +14,7 @@ from .downloads_view import DownloadsView
 from .install_dialog import install_game
 from .launch_options_editor import LaunchOptionsEditor
 from .library_view import GROUP_TITLES, LibraryView
+from .mover import Mover
 from .store import StoreAppPage, StoreView
 from .steam_key_setup import SteamKeyDialog
 from .webview import SteamWebPage, clear_sign_in
@@ -78,6 +79,9 @@ class SuperlionWindow(Adw.ApplicationWindow):
         self.banners = [self.setup_banner, self.pending_banner]
         self._pending_watch = 0
         self._relaunching = False
+        self.mover = Mover(self)
+        self._quitting = False
+        self.connect("close-request", self._on_close_request)
         self.nav.connect("notify::visible-page", self._attach_banners)
         self.nav.connect("popped", lambda _nav, page: getattr(page, "release", lambda: None)())
 
@@ -749,6 +753,8 @@ class SuperlionWindow(Adw.ApplicationWindow):
         self.nav.push(SteamWebPage(self, url, title))
 
     def launch(self, uri, message):
+        if self.steam_held():
+            return
         try:
             steam_control.open_uri(self.config, uri)
             self.toast(message)
@@ -859,6 +865,8 @@ class SuperlionWindow(Adw.ApplicationWindow):
         Gtk.FileLauncher(file=Gio.File.new_for_path(str(path))).launch(self, None, None)
 
     def open_client_store(self):
+        if self.steam_held():
+            return
         try:
             steam_control.open_uri(self.config, "steam://store")
         except GLib.Error as error:
@@ -891,8 +899,44 @@ class SuperlionWindow(Adw.ApplicationWindow):
         if watch and count and not self._pending_watch:
             self._pending_watch = GLib.timeout_add_seconds(5, self._on_pending_watch)
 
+    @property
+    def moving(self):
+        return self.mover.busy
+
+    def steam_held(self):
+        if self.moving:
+            self.toast("Steam starts when the move finishes")
+        return self.moving
+
+    def ask_quit(self):
+        dialog = Adw.AlertDialog(
+            heading="A Game Is Being Moved",
+            body="Quitting stops the move and puts the game back where it was.",
+        )
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("quit", "Quit")
+        dialog.set_response_appearance("quit", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.set_default_response("cancel")
+        dialog.set_close_response("cancel")
+
+        def on_response(_dialog, response):
+            if response != "quit" or self._quitting:
+                return
+            self._quitting = True
+            self.mover.connect("finished", lambda *_: self.get_application().quit())
+            self.mover.cancel()
+
+        dialog.connect("response", on_response)
+        dialog.present(self)
+
+    def _on_close_request(self, _window):
+        if self.moving:
+            self.ask_quit()
+            return True
+        return False
+
     def _on_pending_watch(self):
-        if self._relaunching:
+        if self._relaunching or self.moving:
             return GLib.SOURCE_CONTINUE
         if self._apply_pending_if_closed() and pending.count():
             return GLib.SOURCE_CONTINUE
@@ -900,6 +944,8 @@ class SuperlionWindow(Adw.ApplicationWindow):
         return GLib.SOURCE_REMOVE
 
     def _apply_pending_if_closed(self):
+        if self.moving:
+            return True
         try:
             applied = pending.apply_if_closed(self.config)
         except Exception as error:  # A corrupt Steam file must not stop the library loading.
@@ -934,6 +980,13 @@ class SuperlionWindow(Adw.ApplicationWindow):
         # queue() adds the changes to pending. Steam closed: write now. Steam running with no
         # games under it: restart it without asking. Otherwise ask, naming what would close.
         # start: when Steam was closed, start it hidden after writing (a restart already does).
+        if self.moving:
+            queue()
+            if on_applied:
+                on_applied()
+            self.update_pending(watch=False)
+            self.toast("Saved. Steam gets this when the move finishes.")
+            return
         if not steam_control.is_running(self.config):
             queue()
             try:
@@ -961,16 +1014,9 @@ class SuperlionWindow(Adw.ApplicationWindow):
             self.relaunch_steam(reload=reload, message="Restarting Steam to apply your changes")
             return
 
-        games = [self.find_game(appid) for appid in running]
-        names = [game.props.name for game in games if game]
-        unknown = len(games) - len(names)
-        if unknown == 1:
-            names.append("another game" if names else "a game")
-        elif unknown:
-            names.append(f"{unknown} other games" if names else f"{unknown} games")
         dialog = Adw.AlertDialog(
             heading="Steam Must Be Closed",
-            body=f"{reason} {will_close_text(names)}",
+            body=f"{reason} {will_close_text(self.running_game_names(running))}",
         )
         dialog.add_response("cancel", "Cancel")
         dialog.add_response("later", later_label)
@@ -993,7 +1039,20 @@ class SuperlionWindow(Adw.ApplicationWindow):
         dialog.connect("response", on_response)
         dialog.present(parent or self)
 
+    def running_game_names(self, appids):
+        games = [self.find_game(appid) for appid in appids]
+        names = [game.props.name for game in games if game]
+        unknown = len(games) - len(names)
+        if unknown == 1:
+            names.append("another game" if names else "a game")
+        elif unknown:
+            names.append(f"{unknown} other games" if names else f"{unknown} games")
+        return names
+
     def start_updates(self, appids):
+        if self.steam_held():
+            return
+
         def queue():
             for appid in appids:
                 pending.add(appid, {"start_update": True})
@@ -1043,9 +1102,13 @@ class SuperlionWindow(Adw.ApplicationWindow):
         dialog.present(self)
 
     def install_game(self, appid, name=""):
+        if self.steam_held():
+            return
         install_game(self, appid, name)
 
     def uninstall_game(self, game):
+        if self.steam_held():
+            return
         appid, name = game.props.appid, game.props.name
         self.launch(f"steam://uninstall/{appid}", "Opening Steam's uninstall dialog")
         waited = 0
@@ -1064,7 +1127,7 @@ class SuperlionWindow(Adw.ApplicationWindow):
         GLib.timeout_add_seconds(2, check)
 
     def relaunch_steam(self, reload=False, message="Closing Steam…"):
-        if self._relaunching:
+        if self._relaunching or self.steam_held():
             return
         self._relaunching = True
         self.pending_banner.set_button_label("Relaunching…")

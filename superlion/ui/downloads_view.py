@@ -146,6 +146,8 @@ class DownloadsView(Gtk.Box):
     def check_for_updates(self):
         """Steam checks for updates when it starts and while it runs, so start it if needed."""
         config = self.window.config
+        if self.window.steam_held():
+            return
         if steam_control.start_if_needed(config):
             self.closed_banner.set_revealed(False)
             self.window.toast("Starting Steam, which checks for updates")
@@ -162,6 +164,8 @@ class DownloadsView(Gtk.Box):
             self.window.start_updates(appids)
 
     def _on_start_steam(self, banner):
+        if self.window.steam_held():
+            return
         banner.set_revealed(False)
         steam_control.start(self.window.config)
 

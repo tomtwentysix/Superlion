@@ -673,6 +673,8 @@ class GameDetailsPage(Adw.NavigationPage):
         self.window.install_game(self.game.props.appid, self.game.props.name)
 
     def _open(self, uri, message):
+        if self.window.steam_held():
+            return
         try:
             steam_control.open_uri(self.window.config, uri)
             self.window.toast(message)

@@ -932,6 +932,8 @@ class StoreAppPage(Adw.NavigationPage):
         self.window.store_view.set_wishlisted(self.appid, name, not self._on_wishlist(), self._show_wishlisted)
 
     def _open_uri(self, uri):
+        if self.window.steam_held():
+            return
         try:
             steam_control.open_uri(self.window.config, uri)
         except GLib.Error as error:
