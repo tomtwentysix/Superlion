@@ -876,6 +876,9 @@ class SuperlionWindow(Adw.ApplicationWindow):
         self.toasts.add_toast(Adw.Toast(title=text))
 
     def run_setup(self, first_run=False):
+        if self.moving:
+            self.toast(f"Setup can be run once the {self.mover.what} finishes")
+            return
         start = self.config or config_mod.detect()
         wizard = SetupWizard(start, self, first_run=first_run)
         wizard.connect("finished", self._on_setup_finished)
@@ -905,14 +908,20 @@ class SuperlionWindow(Adw.ApplicationWindow):
 
     def steam_held(self):
         if self.moving:
-            self.toast("Steam starts when the move finishes")
+            if self.mover.was_running:
+                self.toast(f"Steam starts when the {self.mover.what} finishes")
+            else:
+                self.toast(f"Steam can be started once the {self.mover.what} finishes")
         return self.moving
 
     def ask_quit(self):
-        dialog = Adw.AlertDialog(
-            heading="A Game Is Being Moved",
-            body="Quitting stops the move and puts the game back where it was.",
-        )
+        if self.mover.what == "move":
+            heading = "A Game Is Being Moved"
+            body = "Quitting stops the move and puts the game back where it was."
+        else:
+            heading = "Games Are Being Uninstalled"
+            body = "Quitting stops once the game being uninstalled now is removed. The rest stay installed."
+        dialog = Adw.AlertDialog(heading=heading, body=body)
         dialog.add_response("cancel", "Cancel")
         dialog.add_response("quit", "Quit")
         dialog.set_response_appearance("quit", Adw.ResponseAppearance.DESTRUCTIVE)
@@ -921,6 +930,9 @@ class SuperlionWindow(Adw.ApplicationWindow):
 
         def on_response(_dialog, response):
             if response != "quit" or self._quitting:
+                return
+            if not self.moving:
+                self.get_application().quit()
                 return
             self._quitting = True
             self.mover.connect("finished", lambda *_: self.get_application().quit())
@@ -985,7 +997,7 @@ class SuperlionWindow(Adw.ApplicationWindow):
             if on_applied:
                 on_applied()
             self.update_pending(watch=False)
-            self.toast("Saved. Steam gets this when the move finishes.")
+            self.toast(f"Saved. Steam gets this when the {self.mover.what} finishes.")
             return
         if not steam_control.is_running(self.config):
             queue()

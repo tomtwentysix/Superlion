@@ -43,8 +43,18 @@ class Mover(GObject.Object):
         self.jobs = []
         self.progress = moving.Progress()
 
+    @property
+    def what(self):
+        return "uninstall" if self.jobs and self.jobs[0].kind == "uninstall" else "move"
+
     def busy_with(self, appid):
         return self.busy and any(appid in job.appids for job in self.jobs)
+
+    def _refuse_if_busy(self):
+        if self.busy:
+            kind = self.jobs[0].kind
+            self.window.toast(f"Wait until {_games(self.jobs)} {'is' if len(self.jobs) == 1 else 'are'} {DONE[kind]}")
+        return self.busy
 
     def cancel(self):
         self.progress.cancelled = True
@@ -52,6 +62,8 @@ class Mover(GObject.Object):
     def start(self, jobs, parent, verb):
         from .window import will_close_text
 
+        if not jobs or self._refuse_if_busy():
+            return
         config = self.window.config
         if not steam_control.is_running(config):
             self._begin(jobs, verb, was_running=False)
@@ -76,7 +88,7 @@ class Mover(GObject.Object):
         dialog.present(parent or self.window)
 
     def _begin(self, jobs, verb, was_running):
-        if self.busy:
+        if self._refuse_if_busy():
             return
         self.jobs = list(jobs)
         self.progress = moving.Progress()
@@ -151,11 +163,19 @@ class Mover(GObject.Object):
                     error = shortcuts.grant_flatpak_access(new)
                     if error:
                         failures.append((str(new), error))
-        if self.was_running:
-            steam_control.start(config)
         self.busy = False
-        self.window.reload()
+        try:
+            self._report(failures)
+        finally:
+            # Started after the reload, so a retried pending write cannot race Steam starting up.
+            try:
+                if self.was_running:
+                    steam_control.start(config)
+            finally:
+                self.emit("finished", failures)
 
+    def _report(self, failures):
+        self.window.reload()
         if self.succeeded:
             kind = self.succeeded[0].kind
             text = f"{_games(self.succeeded)} {DONE[kind]}"
@@ -177,4 +197,3 @@ class Mover(GObject.Object):
             )
             dialog.add_response("close", "Close")
             dialog.present(self.window)
-        self.emit("finished", failures)
