@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from . import config as config_mod
-from . import library, vdf
+from . import library, moving, vdf
 
 LAUNCH_PATH = ("UserLocalConfigStore", "Software", "Valve", "Steam", "apps")
 COMPAT_PATH = ("InstallConfigStore", "Software", "Valve", "Steam", "CompatToolMapping")
@@ -122,6 +122,18 @@ def remove_shortcuts(data, appids):
     entries.clear()
     entries.update({str(i): e for i, e in enumerate(kept)})
     return data
+
+
+def rewrite_shortcut_paths(config, moves):
+    """Apply {appid: (old_folder, new_folder)} to the matching shortcuts' paths."""
+    path = library.shortcuts_path(config)
+    data = vdf.load_binary(path)
+    entries = vdf.ensure_path(data, "shortcuts")
+    for key, entry in entries.items():
+        appid = library.field(entry, "appid") if isinstance(entry, dict) else None
+        if appid in moves:
+            entries[key] = moving.rewrite_entry(entry, *moves[appid])
+    _write_atomic(path, data, binary=True)
 
 
 def write_changes(config, changes):

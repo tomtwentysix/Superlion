@@ -2,6 +2,8 @@
 
 import errno
 import os
+import re
+import shlex
 import shutil
 from pathlib import Path
 
@@ -229,3 +231,79 @@ def library_contents(folder):
             "tool": library_mod.is_tool(name),
         })
     return games
+
+
+def shortcut_exe(entry):
+    try:
+        words = shlex.split(library_mod.field(entry, "Exe") or "")
+    except ValueError:
+        return None
+    if words and os.path.isabs(words[0]) and os.path.exists(words[0]):
+        return Path(words[0])
+    return None
+
+
+def sharing(entries, appid, folder):
+    folder = Path(folder)
+    ids = []
+    for other, entry in entries.items():
+        exe = shortcut_exe(entry)
+        if other != appid and exe and exe.is_relative_to(folder):
+            ids.append(other)
+    return sorted(ids)
+
+
+def suggest_folder(entries, appid, blocked, home=None, is_mount=os.path.ismount):
+    exe = shortcut_exe(entries[appid])
+    if exe is None:
+        return None
+    home = Path.home() if home is None else Path(home)
+    group = {appid, *sharing(entries, appid, exe.parent)}
+    outside = [e for a, entry in entries.items() if a not in group and (e := shortcut_exe(entry))]
+
+    def allowed(folder):
+        return (
+            folder != home
+            and folder != folder.parent
+            and not is_mount(folder)
+            and not any(folder.is_relative_to(b) for b in blocked)
+            and not any(e.is_relative_to(folder) for e in outside)
+        )
+
+    folder = exe.parent
+    if not allowed(folder):
+        return None
+    while allowed(folder.parent):
+        folder = folder.parent
+    return folder, sorted(group - {appid})
+
+
+def _replace_prefix(text, old, new):
+    # Only whole path components, so /g/X leaves /g/X2 and /h/g/X alone.
+    pattern = r"(?<![^\s\"'=:,])" + re.escape(str(old)) + r"(?=$|[/\s\"'\\:,;])"
+    return re.sub(pattern, lambda _m: str(new), text)
+
+
+def rewrite_entry(entry, old, new):
+    result = {}
+    for key, value in entry.items():
+        if key.lower() in ("exe", "startdir", "icon", "launchoptions") and isinstance(value, str):
+            value = _replace_prefix(value, old, new)
+        result[key] = value
+    return result
+
+
+def move_folder(old, new_parent, progress):
+    old, new_parent = Path(old), Path(new_parent)
+    if new_parent.resolve().is_relative_to(old.resolve()):
+        raise MoveError(f"Cannot move {old.name} into itself")
+    dest = new_parent / old.name
+    _check_free([dest])
+    if same_drive(old, dest) and _rename_all([old], [dest]):
+        return dest
+    _copy_all([old], [dest], progress)
+    try:
+        _remove(old)
+    except OSError as err:
+        raise MoveError(f"Copied, but could not remove the original {old.name}: {err.strerror or err}") from err
+    return dest
