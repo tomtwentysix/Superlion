@@ -99,16 +99,13 @@ def steam_job(game, dest):
     )
 
 
-def _extra_size(game):
-    parts = moving.steam_parts(game.props.library, game.props.appid, Path(game.props.install_dir).name)
-    steamapps = Path(game.props.library) / "steamapps"
-    # SizeOnDisk covers the game folder; the prefix, shader cache and Workshop content are measured.
-    return moving.parts_size([p for p in parts if p.parent not in (steamapps, steamapps / "common")])
-
-
 def choose_library(window, games, on_chosen):
+    # Measured rather than taken from SizeOnDisk, which some games leave far too low (Star Trek
+    # Online's launcher downloads 23 GB that Steam never counts).
+    parts = [moving.steam_parts(g.props.library, g.props.appid, Path(g.props.install_dir).name) for g in games]
+
     def measure():
-        return [game.props.size + _extra_size(game) for game in games]
+        return [moving.parts_size(p) for p in parts]
 
     def done(sizes, error):
         if error:

@@ -1,3 +1,4 @@
+import gc
 from pathlib import Path
 
 import gi
@@ -5,7 +6,7 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 
-from gi.repository import Adw, Gdk, Gio, Gtk  # noqa: E402
+from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
 
 from . import config as config_mod  # noqa: E402
 from . import steam_control  # noqa: E402
@@ -34,10 +35,19 @@ class SuperlionApplication(Adw.Application):
 
     def do_startup(self):
         Adw.Application.do_startup(self)
+        # Python collects garbage in whichever thread is allocating, and a WebKit view freed
+        # off the main thread aborts the app, so collection only runs from the main loop.
+        gc.disable()
+        GLib.timeout_add_seconds(1, self._collect_garbage)
         theme = Gtk.IconTheme.get_for_display(Gdk.Display.get_default())
         for folder in ICON_DIRS:
             theme.add_search_path(str(folder))
         Gtk.Window.set_default_icon_name(config_mod.ICON_NAME)
+
+    def _collect_garbage(self):
+        if any(count > limit for count, limit in zip(gc.get_count(), gc.get_threshold())):
+            gc.collect()
+        return GLib.SOURCE_CONTINUE
 
     def do_activate(self):
         from .ui.window import SuperlionWindow
