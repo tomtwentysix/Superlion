@@ -78,7 +78,7 @@ class SuperlionWindow(Adw.ApplicationWindow):
         self.pending_banner.connect("button-clicked", lambda *_: self.relaunch_steam())
         self.banners = [self.setup_banner, self.pending_banner]
         self._pending_watch = 0
-        self._relaunching = False
+        self.relaunching = False
         self.mover = Mover(self)
         self._quitting = False
         self.connect("close-request", self._on_close_request)
@@ -608,7 +608,7 @@ class SuperlionWindow(Adw.ApplicationWindow):
             pending.add(game.props.appid, {"name": name})
             if steam_control.is_running(self.config):
                 self.update_pending()
-            else:
+            elif not self._hold_for_mover():
                 try:
                     pending.apply_now(self.config)
                 except (OSError, ValueError) as error:
@@ -661,6 +661,8 @@ class SuperlionWindow(Adw.ApplicationWindow):
     def queue_steam_sync(self):
         # Unlike sync_collections, this never sends Superlion's own collections and never asks.
         pending.add_collections_sync(include_own=False)
+        if self._hold_for_mover():
+            return
         if steam_control.is_running(self.config):
             self.update_pending()
             return
@@ -936,13 +938,29 @@ class SuperlionWindow(Adw.ApplicationWindow):
                 self.toast(f"Steam can be started once the {self.mover.what} finishes")
         return self.moving
 
+    def _hold_for_mover(self):
+        # Steam is closed during a move, but its files must not change until the move finishes.
+        if self.moving:
+            self.update_pending(watch=False)
+            self.toast(f"Saved. Steam gets this when the {self.mover.what} finishes.")
+        return self.moving
+
     def ask_quit(self):
-        if self.mover.what == "move":
+        several = len(self.mover.jobs) > 1
+        if self.mover.what == "move" and several:
+            heading = "Games Are Being Moved"
+            body = ("Quitting stops after the game being moved now. If it is still being copied, it stays "
+                    "where it was. Games already moved stay in their new library.")
+        elif self.mover.what == "move":
             heading = "A Game Is Being Moved"
-            body = "Quitting stops the move and puts the game back where it was."
-        else:
+            body = ("If it is still being copied, quitting stops the copy and it stays where it was. "
+                    "Otherwise the move finishes first.")
+        elif several:
             heading = "Games Are Being Uninstalled"
             body = "Quitting stops once the game being uninstalled now is removed. The rest stay installed."
+        else:
+            heading = "A Game Is Being Uninstalled"
+            body = "Superlion quits once it is removed."
         dialog = Adw.AlertDialog(heading=heading, body=body)
         dialog.add_response("cancel", "Cancel")
         dialog.add_response("quit", "Quit")
@@ -970,7 +988,7 @@ class SuperlionWindow(Adw.ApplicationWindow):
         return False
 
     def _on_pending_watch(self):
-        if self._relaunching or self.moving:
+        if self.relaunching or self.moving:
             return GLib.SOURCE_CONTINUE
         if self._apply_pending_if_closed() and pending.count():
             return GLib.SOURCE_CONTINUE
@@ -1018,8 +1036,7 @@ class SuperlionWindow(Adw.ApplicationWindow):
             queue()
             if on_applied:
                 on_applied()
-            self.update_pending(watch=False)
-            self.toast(f"Saved. Steam gets this when the {self.mover.what} finishes.")
+            self._hold_for_mover()
             return
         if not steam_control.is_running(self.config):
             queue()
@@ -1161,14 +1178,14 @@ class SuperlionWindow(Adw.ApplicationWindow):
         GLib.timeout_add_seconds(2, check)
 
     def relaunch_steam(self, reload=False, message="Closing Steam…"):
-        if self._relaunching or self.steam_held():
+        if self.relaunching or self.steam_held():
             return
-        self._relaunching = True
+        self.relaunching = True
         self.pending_banner.set_button_label("Relaunching…")
         self.toast(message)
 
         def done(error):
-            self._relaunching = False
+            self.relaunching = False
             self.pending_banner.set_button_label("Relaunch Steam")
             self.toast(error or "Changes written and Steam restarted")
             self.library.refresh_sidebar()

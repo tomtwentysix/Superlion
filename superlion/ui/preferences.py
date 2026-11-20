@@ -35,6 +35,7 @@ class PreferencesDialog(Adw.PreferencesDialog):
         self.collect_libraries = library_groups(
             steam.add, self.state, lambda: self, window.update_setup_banner,
             show_games=lambda folder: self.push_subpage(LibraryFolderPage(window, folder)),
+            held=lambda: window.moving and f"Wait until the {window.mover.what} under way finishes.",
         )
         self.add(steam)
 

@@ -374,9 +374,10 @@ def show_folder_status(row, folder):
     return update
 
 
-def library_groups(add_group, state, get_parent, on_rescan=None, show_games=None):
+def library_groups(add_group, state, get_parent, on_rescan=None, show_games=None, held=None):
     # Returns collect(state), which writes the choices into state and returns True
     # if a folder was removed from Steam, which changes Steam's files but not state.
+    # held() returns why Steam's files cannot be changed now, if they cannot.
     group = Adw.PreferencesGroup(
         title="Library Folders", description="Games in folders that are turned off are hidden."
     )
@@ -423,6 +424,12 @@ def library_groups(add_group, state, get_parent, on_rescan=None, show_games=None
         group.add(steam_error)
 
     def confirm_unregister(folder):
+        reason = held and held()
+        if reason:
+            dialog = Adw.AlertDialog(heading="Library Folder Cannot Be Removed", body=reason)
+            dialog.add_response("close", "Close")
+            dialog.present(get_parent())
+            return
         running = steam_control.is_running(state)
         body = (
             f"Steam will stop using {short_path(folder)}. The games in it stay on the drive, "

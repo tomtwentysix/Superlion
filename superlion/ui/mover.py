@@ -51,6 +51,9 @@ class Mover(GObject.Object):
         return self.busy and any(appid in job.appids for job in self.jobs)
 
     def _refuse_if_busy(self):
+        if self.window.relaunching:
+            self.window.toast("Wait until Steam has restarted")
+            return True
         if self.busy:
             kind = self.jobs[0].kind
             self.window.toast(f"Wait until {_games(self.jobs)} {'is' if len(self.jobs) == 1 else 'are'} {DONE[kind]}")

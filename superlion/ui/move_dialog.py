@@ -28,6 +28,11 @@ def _blocked(config):
     return [folder / "steamapps" for folder in folders]
 
 
+def _kept():
+    folders = (GLib.get_user_special_dir(d) for d in GLib.UserDirectory if d != GLib.UserDirectory.N_DIRECTORIES)
+    return [Path(f) for f in folders if f]
+
+
 def blocker(window, game):
     config, appid = window.config, game.props.appid
     if window.moving:
@@ -39,10 +44,14 @@ def blocker(window, game):
         exe = moving.shortcut_exe(entries[appid]) if appid in entries else None
         if exe is None:
             return "Its executable is not a file path, so Superlion cannot tell which folder holds the game."
-        if moving.suggest_folder(entries, appid, _blocked(config)) is None:
+        if moving.suggest_folder(entries, appid, _blocked(config), keep=_kept()) is None:
             folder = short_path(exe.parent)
-            return f"Its executable is in {folder}, which is a drive, your home folder or part of a Steam library."
+            return (f"Its executable is in {folder}, which is a drive, your home folder, "
+                    "a folder such as Downloads or part of a Steam library.")
         return None
+    others = moving.folder_sharers(game.props.library, appid, Path(game.props.install_dir).name)
+    if others:
+        return f"It shares its folder with {', '.join(others)}, so it cannot be moved on its own."
     item = downloads.state_for(config, appid)
     if downloads.is_busy(item, True):
         if item.status == "paused":
@@ -189,7 +198,8 @@ def _move_shortcut(window, game):
     entries = library.read_shortcuts(config)
     blocked = _blocked(config)
     exe = moving.shortcut_exe(entries[appid])
-    folder, _shared = moving.suggest_folder(entries, appid, blocked)
+    kept = _kept()
+    folder, _shared = moving.suggest_folder(entries, appid, blocked, keep=kept)
     state = {"folder": folder, "target": None}
 
     dialog = Adw.AlertDialog(heading=f"Move {name}")
@@ -220,11 +230,12 @@ def _move_shortcut(window, game):
         home = Path.home()
         if not exe.parent.is_relative_to(picked):
             _alert(dialog, "Folder Cannot Be Moved", f"Choose a folder that holds {exe.name}.")
-        elif picked == home or os.path.ismount(picked) or any(
+        elif picked == home or picked in kept or os.path.ismount(picked) or any(
             picked.is_relative_to(b) or b.is_relative_to(picked) for b in blocked
         ):
             _alert(dialog, "Folder Cannot Be Moved",
-                   "Drives, your home folder and folders holding a Steam library cannot be moved.")
+                   "Drives, your home folder, folders such as Downloads and folders holding a Steam library "
+                   "cannot be moved.")
         else:
             state["folder"] = picked
             show_folder()

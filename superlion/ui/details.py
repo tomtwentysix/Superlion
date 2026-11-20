@@ -86,6 +86,8 @@ class GameDetailsPage(Adw.NavigationPage):
         content.append(Adw.Clamp(child=body, maximum_size=860))
         self.media = None
         self.connect("hidden", lambda *_: self.media and self.media.pause())
+        self._moved = False
+        self.connect("shown", lambda *_: self._moved and self._show_moved())
         if game.props.store_appid:
             self._load_store_content()
         self._watch_downloads()
@@ -232,11 +234,17 @@ class GameDetailsPage(Adw.NavigationPage):
             return
         self.move_area.set_visible(False)
         self.primary.set_sensitive(True)
-        nav = self.window.nav
-        if nav.get_visible_page() is not self or not any(appid in job.appids for job in mover.succeeded):
+        if not any(appid in job.appids for job in mover.succeeded):
             return
         # The reload made new Game objects; this page still shows the old folders.
-        game = self.window.find_game(appid)
+        self._moved = True
+        if self.window.nav.get_visible_page() is self:
+            self._show_moved()
+
+    def _show_moved(self):
+        self._moved = False
+        nav = self.window.nav
+        game = self.window.find_game(self.game.props.appid)
         if game is self.game:
             return
         self.release()

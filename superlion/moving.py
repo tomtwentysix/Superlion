@@ -11,6 +11,8 @@ from . import library as library_mod
 from . import vdf
 
 CHUNK = 1024 * 1024
+# Folders a game keeps its executables in, below the game's own folder.
+BIN_FOLDERS = {"bin", "bin32", "bin64", "binaries", "system", "win32", "win64", "x64", "x86", "x86_64"}
 
 
 class MoveError(Exception):
@@ -41,6 +43,16 @@ def steam_parts(library, appid, installdir):
     return [p for p in candidates if os.path.lexists(p)]
 
 
+def folder_sharers(library, appid, installdir):
+    # Steam lets several apps share one folder in common/, such as Half-Life 2 and its episodes.
+    if not installdir:
+        return []
+    return sorted(
+        game["name"] for game in library_contents(library)
+        if game["appid"] != appid and game["installdir"] == installdir
+    )
+
+
 def _walk_size(path):
     if path.is_symlink():
         return 0
@@ -62,7 +74,7 @@ def same_drive(a, b):
         path = Path(path)
         while not os.path.lexists(path):
             path = path.parent
-        return os.lstat(path).st_dev
+        return os.stat(path).st_dev
 
     return device(a) == device(b)
 
@@ -181,11 +193,22 @@ def _copy_all(parts, destinations, progress):
         if isinstance(err, MoveError):
             raise
         raise MoveError(f"Could not copy {src.name}: {err.strerror or err}") from err
+    # The originals are removed next, so the copy must be on the disk first.
+    os.sync()
     progress.done = progress.total
 
 
+def _installed_parts(library, appid, installdir):
+    if not os.path.lexists(Path(library) / "steamapps" / f"appmanifest_{appid}.acf"):
+        raise MoveError(f"It is no longer installed in {library}")
+    return steam_parts(library, appid, installdir)
+
+
 def move_steam_game(source, target, appid, installdir, progress):
-    parts = steam_parts(source, appid, installdir)
+    parts = _installed_parts(source, appid, installdir)
+    others = folder_sharers(source, appid, installdir)
+    if others:
+        raise MoveError(f"Its folder is shared with {', '.join(others)}, so it cannot be moved on its own")
     destinations = _destinations(source, target, parts)
     _check_free(destinations)
     if same_drive(Path(source) / "steamapps", Path(target) / "steamapps"):
@@ -201,7 +224,10 @@ def move_steam_game(source, target, appid, installdir, progress):
 
 
 def delete_steam_game(library, appid, installdir, progress):
-    parts = steam_parts(library, appid, installdir)
+    parts = _installed_parts(library, appid, installdir)
+    if folder_sharers(library, appid, installdir):
+        shared = Path(library) / "steamapps" / "common" / installdir
+        parts = [p for p in parts if p != shared]
     progress.total = len(parts)
     progress.done = 0
     for part in reversed(parts):
@@ -253,7 +279,8 @@ def sharing(entries, appid, folder):
     return sorted(ids)
 
 
-def suggest_folder(entries, appid, blocked, home=None, is_mount=os.path.ismount):
+def suggest_folder(entries, appid, blocked, home=None, is_mount=os.path.ismount, keep=()):
+    # keep: folders never to suggest, such as Downloads.
     exe = shortcut_exe(entries[appid])
     if exe is None:
         return None
@@ -264,6 +291,7 @@ def suggest_folder(entries, appid, blocked, home=None, is_mount=os.path.ismount)
     def allowed(folder):
         return (
             folder != home
+            and folder not in keep
             and folder != folder.parent
             and not is_mount(folder)
             and not any(folder.is_relative_to(b) or b.is_relative_to(folder) for b in blocked)
@@ -273,7 +301,12 @@ def suggest_folder(entries, appid, blocked, home=None, is_mount=os.path.ismount)
     folder = exe.parent
     if not allowed(folder):
         return None
-    while allowed(folder.parent):
+    # A folder straight under home, a drive or a kept folder, such as ~/Games, usually holds
+    # more than one game, so it is only climbed to out of a folder like bin.
+    def top_level(candidate):
+        return candidate.parent == home or is_mount(candidate.parent) or candidate.parent in keep
+
+    while allowed(folder.parent) and (folder.name.lower() in BIN_FOLDERS or not top_level(folder.parent)):
         folder = folder.parent
     return folder, sorted(group - {appid})
 
