@@ -1,5 +1,6 @@
 """Moving and deleting games' files."""
 
+import errno
 import os
 import shutil
 from pathlib import Path
@@ -24,6 +25,8 @@ class Progress:
 
 
 def steam_parts(library, appid, installdir):
+    if not installdir or installdir in (".", "..") or Path(installdir).name != installdir:
+        raise MoveError(f"Invalid install folder name: {installdir!r}")
     steamapps = Path(library) / "steamapps"
     candidates = [
         steamapps / "common" / installdir,
@@ -84,12 +87,21 @@ def _copy_tree(src, dst, progress):
         shutil.copystat(src, dst)
     elif src.is_file():
         _copy_file(src, dst, progress)
+    else:
+        raise MoveError(f"Cannot copy {src}: unsupported file type")
+
+
+def _make_writable(func, path, _err):
+    # copystat can leave read-only directories behind, which rmtree cannot empty.
+    parent = Path(path).parent
+    os.chmod(parent, os.stat(parent).st_mode | 0o700)
+    func(path)
 
 
 def _remove(path):
     path = Path(path)
     if path.is_dir() and not path.is_symlink():
-        shutil.rmtree(path)
+        shutil.rmtree(path, onexc=_make_writable)
     else:
         path.unlink()
 
@@ -131,6 +143,7 @@ def _check_free(destinations):
 
 
 def _rename_all(parts, destinations):
+    # Returns False if the paths are on different mounts (EXDEV) after undoing any renames.
     done, created = [], []
     try:
         for src, dst in zip(parts, destinations):
@@ -138,13 +151,16 @@ def _rename_all(parts, destinations):
             os.rename(src, dst)
             done.append((src, dst))
     except OSError as err:
-        for src, dst in reversed(done):
+        for done_src, done_dst in reversed(done):
             try:
-                os.rename(dst, src)
+                os.rename(done_dst, done_src)
             except OSError:
                 pass
         _prune(created)
+        if err.errno == errno.EXDEV:
+            return False
         raise MoveError(f"Could not move {src.name}: {err.strerror or err}") from err
+    return True
 
 
 def _copy_all(parts, destinations, progress):
@@ -171,8 +187,8 @@ def move_steam_game(source, target, appid, installdir, progress):
     destinations = _destinations(source, target, parts)
     _check_free(destinations)
     if same_drive(Path(source) / "steamapps", Path(target) / "steamapps"):
-        _rename_all(parts, destinations)
-        return
+        if _rename_all(parts, destinations):
+            return
     _copy_all(parts, destinations, progress)
     # The copy is complete; remove the manifest first so Steam never lists the game twice.
     try:
