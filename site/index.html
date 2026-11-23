@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Superlion: a native Linux app for your Steam library</title>
+  <meta name="description" content="A native GTK 4 app for your Steam library on Linux: organise games, edit launch options, manage Proton builds and stream with Sunshine, without Steam's window.">
+  <link rel="canonical" href="https://tomtwentysix.github.io/Superlion/">
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#16130f" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#faf8f5" media="(prefers-color-scheme: light)">
+  <link rel="icon" href="images/icon.svg" type="image/svg+xml">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Superlion: a native Linux app for your Steam library">
+  <meta property="og:description" content="Browse and organise your Steam games, edit launch options, manage Proton builds and stream with Sunshine, all without opening Steam's window.">
+  <meta property="og:url" content="https://tomtwentysix.github.io/Superlion/">
+  <meta property="og:image" content="https://tomtwentysix.github.io/Superlion/images/social-preview.png">
+  <meta property="og:image:width" content="1280">
+  <meta property="og:image:height" content="640">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Inter:wght@400;600&display=swap">
+  <link rel="stylesheet" href="style.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Superlion",
+    "description": "A native Linux app for your Steam library, built with GTK 4 and libadwaita.",
+    "applicationCategory": "GameApplication",
+    "operatingSystem": "Linux",
+    "url": "https://tomtwentysix.github.io/Superlion/",
+    "downloadUrl": "https://copr.fedorainfracloud.org/coprs/solartw/superlion/",
+    "license": "https://www.gnu.org/licenses/gpl-3.0.html",
+    "image": "https://tomtwentysix.github.io/Superlion/images/library.webp",
+    "author": { "@type": "Organization", "name": "SolarFlare Developments" },
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "GBP" }
+  }
+  </script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="wrap header-row">
+      <a class="brand" href="./">
+        <img src="images/icon.svg" width="36" height="36" alt="">
+        <span>Superlion</span>
+      </a>
+      <nav aria-label="Main">
+        <a href="#features">Features</a>
+        <a href="#install">Install</a>
+        <a href="https://github.com/tomtwentysix/Superlion">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero wrap">
+      <div class="hero-text">
+        <p class="eyebrow">Free and open source for Linux</p>
+        <h1>Your Steam library, at home on your Linux desktop</h1>
+        <p class="lede">Superlion shows the games you've installed and the ones you own, and lets you browse the store, sort out launch options, Proton builds and artwork, and stream games through Sunshine, all without opening Steam's own window.</p>
+        <div class="actions">
+          <a class="button primary" href="#install">Install from COPR</a>
+          <a class="button secondary" href="https://github.com/tomtwentysix/Superlion">View on GitHub</a>
+        </div>
+      </div>
+      <img class="shot hero-shot" src="images/library.webp" width="1280" height="900"
+           alt="Superlion's library: game covers in a grid, with collections such as Favourites and VR Games in the sidebar">
+    </section>
+
+    <section id="features" class="features wrap" aria-labelledby="features-title">
+      <h2 id="features-title" class="visually-hidden">Features</h2>
+
+      <article class="feature">
+        <div class="feature-text">
+          <h3>Your whole library in one place</h3>
+          <p>Installed games, games you own but haven't installed, and non-Steam games, side by side. Filter by Steam's collections or your own, search by name, initials or app ID, and sort or group by size, last played, release date or genre.</p>
+        </div>
+        <img class="shot" src="images/library-narrow.webp" width="909" height="925" loading="lazy"
+             alt="The library in a narrow window, with game covers in four columns and an Install button on a game that is not installed">
+      </article>
+
+      <article class="feature">
+        <div class="feature-text">
+          <h3>A page for every game</h3>
+          <p>Trailers, screenshots, news and install details. Play turns into Stop while a game's running, and games can be moved to another drive, uninstalled or removed from here.</p>
+        </div>
+        <img class="shot" src="images/game-overview.webp" width="1280" height="900" loading="lazy"
+             alt="A game's page, with its artwork, Play button, trailers and screenshots">
+      </article>
+
+      <article class="feature">
+        <div class="feature-text">
+          <h3>Launch options without the guesswork</h3>
+          <p>Switch over 100 common settings on and off, with warnings for ones that clash or do nothing. Presets save the combinations you use often.</p>
+        </div>
+        <img class="shot" src="images/launch-options.webp" width="1280" height="900" loading="lazy"
+             alt="The launch options editor for Baldur&#39;s Gate 3, with the full launch line, presets, and warnings for settings that are not needed">
+      </article>
+
+      <article class="feature">
+        <div class="feature-text">
+          <h3>The Steam store, natively</h3>
+          <p>Browse with local prices, watch trailers, and manage your wishlist and cart in the same window as your library.</p>
+        </div>
+        <img class="shot" src="images/store.webp" width="1280" height="900" loading="lazy"
+             alt="The store, with featured games and categories">
+      </article>
+
+      <article class="feature">
+        <div class="feature-text">
+          <h3>Downloads, and updates when you want them</h3>
+          <p>See what Steam's downloading, with progress on each game's cover. Start waiting updates or resume paused ones without opening Steam's window.</p>
+        </div>
+        <img class="shot" src="images/downloads.webp" width="1280" height="900" loading="lazy"
+             alt="The Downloads page, with a paused download and updates waiting with their sizes and scheduled times">
+      </article>
+    </section>
+
+    <section class="more wrap" aria-labelledby="more-title">
+      <h2 id="more-title">And the rest</h2>
+      <dl class="more-list">
+        <div>
+          <dt>Library folders</dt>
+          <dd>See what each drive holds, then move, uninstall, hide or collect several games at once.</dd>
+        </div>
+        <div>
+          <dt>Proton builds</dt>
+          <dd>Install and update GE-Proton and Proton-CachyOS from Preferences.</dd>
+        </div>
+        <div>
+          <dt>Non-Steam games</dt>
+          <dd>Add them from Files and match them to a store game for its artwork and news. Artwork can also come from SteamGridDB.</dd>
+        </div>
+        <div>
+          <dt>Mod managers</dt>
+          <dd>Link one to a game and launch it from the game's page, with the same Proton and launch settings as a game.</dd>
+        </div>
+        <div>
+          <dt>Streaming</dt>
+          <dd>Send games to Moonlight through Sunshine. Superlion matches your display to the client's resolution, refresh rate and HDR, then puts it back afterwards.</dd>
+        </div>
+      </dl>
+    </section>
+
+    <section class="steam wrap" aria-labelledby="steam-title">
+      <h2 id="steam-title">Steam stays out of the way</h2>
+      <p>Steam keeps some of its files in memory and overwrites them when it quits, so Superlion only writes to them while Steam's closed. When a change needs Steam to restart, it restarts quietly in the background, and only asks first if a game would close. Steam's settings files are backed up before they're written.</p>
+    </section>
+
+    <section id="install" class="install wrap" aria-labelledby="install-title">
+      <h2 id="install-title">Install</h2>
+      <p>On Fedora, install Superlion from <a href="https://copr.fedorainfracloud.org/coprs/solartw/superlion/">COPR</a>:</p>
+      <div class="code">
+        <pre><code>sudo dnf copr enable solartw/superlion
+sudo dnf install superlion</code></pre>
+        <button type="button" class="copy" data-copy="sudo dnf copr enable solartw/superlion &amp;&amp; sudo dnf install superlion">Copy</button>
+      </div>
+      <p class="note">Store trailers need an H.264 decoder, such as <code>gstreamer1-plugin-libav</code> or <code>gstreamer1-plugin-openh264</code>. The first time you open Superlion, a setup wizard finds your Steam installation, account and library folders.</p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap footer-row">
+      <p>Made by SolarFlare Developments. Free software under the <a href="https://github.com/tomtwentysix/Superlion/blob/main/LICENSE">GPL-3.0</a>.</p>
+      <p>Named after the Fowler B6 Super Lion traction engine, and dedicated to the memory of John Wharton (1953–2026).</p>
+    </div>
+  </footer>
+
+  <script>
+    for (const button of document.querySelectorAll(".copy")) {
+      button.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(button.dataset.copy);
+          button.textContent = "Copied";
+        } catch {
+          button.textContent = "Select and copy";
+        }
+        setTimeout(() => { button.textContent = "Copy"; }, 2000);
+      });
+    }
+  </script>
+</body>
+</html>
