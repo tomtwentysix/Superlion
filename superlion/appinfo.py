@@ -1,8 +1,9 @@
-"""Release dates and genres from Steam's local app database (appcache/appinfo.vdf).
+"""Release dates and genres from Steam's local app database.
 
 The Steam client keeps metadata for every app the account has seen, installed
-or not, in this binary file. Only the few fields Superlion uses are extracted,
-and the result is cached until Steam rewrites the file.
+or not, in appcache/appinfo.vdf, or since late 2026 in 256 shards under
+appcache/appinfo/. Only the few fields Superlion uses are extracted, and the
+result is cached until Steam rewrites the files.
 """
 
 import json
@@ -12,7 +13,7 @@ from pathlib import Path
 
 from . import config as config_mod
 
-CACHE_VERSION = 5  # Raised when the extracted fields change, so old caches are rebuilt.
+CACHE_VERSION = 6  # Raised when the extracted fields change, so old caches are rebuilt.
 
 VR_NONE, VR_SUPPORTED, VR_REQUIRED = 0, 1, 2
 # Store categories: 31 "VR Support" (older), 53 "VR Supported", 54 "VR Only".
@@ -20,6 +21,7 @@ VR_CATEGORIES = {"category_31", "category_53", "category_54"}
 
 MAGIC_V28 = 0x07564428
 MAGIC_V29 = 0x07564429  # Keys are indexes into a string table at the end of the file.
+MAGIC_V42 = 0x0756442A  # One shard of appcache/appinfo/appinfo_00.vdf … appinfo_ff.vdf.
 
 # Steam's genre IDs, as used by the store; names match its English store pages.
 GENRES = {
@@ -58,22 +60,17 @@ def _cache_path():
     return config_mod.cache_dir() / "appinfo.json"
 
 
-def _parse(data):
-    """{appid: {"name", "type", "release", "vr", "genres", "installdir", "download_size", "builds"}}"""
-    magic, _universe = struct.unpack_from("<II", data, 0)
-    if magic == MAGIC_V29:
-        (table_offset,) = struct.unpack_from("<q", data, 8)
-        (count,) = struct.unpack_from("<I", data, table_offset)
-        strings, pos = [], table_offset + 4
-        for _ in range(count):
-            end = data.index(b"\0", pos)
-            strings.append(data[pos:end].decode("utf-8", "replace"))
-            pos = end + 1
-        pos = 16
-    elif magic == MAGIC_V28:
-        strings, pos = None, 8
-    else:
-        raise ValueError(f"Unsupported appinfo.vdf version {magic:#x}")
+def _strings(data, pos, count):
+    strings = []
+    for _ in range(count):
+        end = data.index(b"\0", pos)
+        strings.append(data[pos:end].decode("utf-8", "replace"))
+        pos = end + 1
+    return strings
+
+
+def _keyvalues(data, pos, strings):
+    """Binary KeyValues at pos; keys are indexes into strings, or inline when strings is None."""
 
     def read_key(pos):
         if strings is not None:
@@ -104,6 +101,44 @@ def _parse(data):
             else:
                 raise ValueError(f"Unknown value type {kind} at offset {pos - 1}")
 
+    try:
+        return read_map(pos)[0]
+    except (ValueError, IndexError, struct.error):
+        return {}
+
+
+def _summary(node):
+    info = node.get("appinfo") or {}
+    common = info.get("common") or {}
+    release = common.get("original_release_date") or common.get("steam_release_date") or 0
+    genre_ids = (common.get("genres") or {}).values()
+    return {
+        "name": common.get("name", ""),
+        "type": str(common.get("type", "")).lower(),
+        "release": int(release) if str(release).isdigit() else 0,
+        "vr": _vr_level(common),
+        # Retired genre IDs that the store no longer shows are skipped.
+        "genres": [GENRES[int(g)] for g in genre_ids if str(g).isdigit() and int(g) in GENRES],
+        "installdir": str((info.get("config") or {}).get("installdir", "")),
+        "download_size": _download_size(info.get("depots") or {}),
+        "builds": _builds(info.get("depots") or {}),
+    }
+
+
+def _parse(data):
+    """{appid: {"name", "type", "release", "vr", "genres", "installdir", "download_size", "builds"}}"""
+    (magic,) = struct.unpack_from("<I", data, 0)
+    if magic == MAGIC_V42:
+        return _parse_shard(data)
+    if magic == MAGIC_V29:
+        (table_offset,) = struct.unpack_from("<q", data, 8)
+        (count,) = struct.unpack_from("<I", data, table_offset)
+        strings, pos = _strings(data, table_offset + 4, count), 16
+    elif magic == MAGIC_V28:
+        strings, pos = None, 8
+    else:
+        raise ValueError(f"Unsupported appinfo.vdf version {magic:#x}")
+
     # Each entry: app ID, size, info state, last updated, PICS token, text SHA-1,
     # change number, binary SHA-1, then the app's binary KeyValues.
     header = 4 + 4 + 8 + 20 + 4 + 20
@@ -114,26 +149,27 @@ def _parse(data):
             break
         (size,) = struct.unpack_from("<I", data, pos + 4)
         start = pos + 8
-        try:
-            node, _ = read_map(start + header)
-        except (ValueError, IndexError, struct.error):
-            node = {}
-        info = node.get("appinfo") or {}
-        common = info.get("common") or {}
-        release = common.get("original_release_date") or common.get("steam_release_date") or 0
-        genre_ids = (common.get("genres") or {}).values()
-        apps[appid] = {
-            "name": common.get("name", ""),
-            "type": str(common.get("type", "")).lower(),
-            "release": int(release) if str(release).isdigit() else 0,
-            "vr": _vr_level(common),
-            # Retired genre IDs that the store no longer shows are skipped.
-            "genres": [GENRES[int(g)] for g in genre_ids if str(g).isdigit() and int(g) in GENRES],
-            "installdir": str((info.get("config") or {}).get("installdir", "")),
-            "download_size": _download_size(info.get("depots") or {}),
-            "builds": _builds(info.get("depots") or {}),
-        }
+        apps[appid] = _summary(_keyvalues(data, start + header, strings))
         pos = start + size
+    return apps
+
+
+def _parse_shard(data):
+    # Header: magic, universe, shard index, shard count, app count, index size, string count,
+    # string table size, data size, two CRCs. Then the index, the string table and the data.
+    _magic, _universe, _shard, _shards, count, index_size, string_count, table_size = (
+        struct.unpack_from("<8I", data, 0)
+    )
+    index = 44
+    strings = _strings(data, index + index_size, string_count)
+    blobs = index + index_size + table_size
+    apps, pos = {}, index
+    for _ in range(count):
+        # Each index record: app ID, data offset, data size, then a summary of that many bytes.
+        appid, offset, _size, summary = struct.unpack_from("<4I", data, pos)
+        # Each app's data starts with the SHA-1 of its KeyValues.
+        apps[appid] = _summary(_keyvalues(data, blobs + offset + 20, strings))
+        pos += 16 + summary
     return apps
 
 
@@ -191,32 +227,46 @@ def _vr_level(common):
     return VR_NONE
 
 
+def _sources(steam_root):
+    """The appinfo files, the sharded format first; [] when there are none."""
+    shards = sorted((Path(steam_root) / "appcache" / "appinfo").glob("appinfo_*.vdf"))
+    if shards:
+        return shards
+    single = Path(steam_root) / "appcache" / "appinfo.vdf"
+    return [single] if single.exists() else []
+
+
 def load(steam_root):
     """App metadata keyed by app ID; {} when Steam's database cannot be read."""
-    source = Path(steam_root) / "appcache" / "appinfo.vdf"
+    sources = _sources(steam_root)
     try:
-        mtime = source.stat().st_mtime
+        stamp = [len(sources), max(source.stat().st_mtime for source in sources)] if sources else None
     except OSError:
+        stamp = None
+    if stamp is None:
         return {}
     cache = _cache_path()
     try:
         cached = json.loads(cache.read_text())
         if (
             cached.get("version") == CACHE_VERSION
-            and cached.get("source") == str(source)
-            and cached.get("mtime") == mtime
+            and cached.get("source") == str(sources[0].parent)
+            and cached.get("mtime") == stamp
         ):
             return {int(k): v for k, v in cached["apps"].items()}
     except (OSError, ValueError, KeyError):
         pass
-    try:
-        apps = _parse(source.read_bytes())
-    except (OSError, ValueError, struct.error):
-        return {}
+    apps = {}
+    for source in sources:
+        try:
+            apps.update(_parse(source.read_bytes()))
+        except (OSError, ValueError, IndexError, struct.error):
+            if len(sources) == 1:
+                return {}
     cache.parent.mkdir(parents=True, exist_ok=True)
     tmp = cache.with_suffix(".tmp")
     tmp.write_text(
-        json.dumps({"version": CACHE_VERSION, "source": str(source), "mtime": mtime, "apps": apps})
+        json.dumps({"version": CACHE_VERSION, "source": str(sources[0].parent), "mtime": stamp, "apps": apps})
     )
     os.replace(tmp, cache)
     return apps
