@@ -17,6 +17,7 @@ for shot in (ROOT / "screenshots").glob("*.png"):
     Image.open(shot).save(images / f"{shot.stem}.webp", quality=82, method=6)
 shutil.copy(ROOT / "data/icons/hicolor/scalable/apps/uk.co.solarflareit.Superlion.svg", images / "icon.svg")
 shutil.copy(ROOT / "data/social-preview.png", images / "social-preview.png")
+Image.open(ROOT / "data/dedication/john-wharton.png").save(images / "john-wharton.webp", quality=85, method=6)
 # Google Search Console checks this file at the site's root.
 for verification in ROOT.glob("google*.html"):
     shutil.copy(verification, OUT)

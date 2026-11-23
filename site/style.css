@@ -149,6 +149,14 @@ code { font: 0.9375rem/1.6 var(--mono); }
 }
 .copy:hover { border-color: var(--muted); }
 
+.dedication {
+  display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 32px 48px; align-items: center;
+  padding-block: 64px 96px; border-top: 1px solid var(--border);
+}
+.dedication img { border-radius: 50%; border: 3px solid var(--brass); aspect-ratio: 1; object-fit: cover; }
+.dedication-text { display: grid; gap: 12px; max-width: 62ch; }
+.dedication-details { color: var(--muted); }
+
 .site-footer { border-top: 1px solid var(--border); padding-block: 32px; color: var(--muted); font-size: 0.875rem; }
 .footer-row { display: grid; gap: 8px; }
 
@@ -158,6 +166,8 @@ code { font: 0.9375rem/1.6 var(--mono); }
   .hero { padding-block: 64px; gap: 40px; }
   .features { gap: 64px; padding-bottom: 64px; }
   .more, .steam, .install { padding-block: 48px; }
+  .dedication { grid-template-columns: minmax(0, 1fr); padding-block: 48px 64px; }
+  .dedication img { width: 160px; }
   nav { gap: 16px; }
 }
 

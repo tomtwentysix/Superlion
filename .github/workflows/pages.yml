@@ -3,7 +3,7 @@ name: Website
 on:
   push:
     branches: [main]
-    paths: [site/**, screenshots/**, data/social-preview.png, data/icons/**, google*.html, .github/workflows/pages.yml]
+    paths: [site/**, screenshots/**, data/social-preview.png, data/icons/**, data/dedication/**, google*.html, .github/workflows/pages.yml]
   workflow_dispatch:
 
 permissions:
