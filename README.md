@@ -12,8 +12,9 @@ Superlion is a native Linux app for your Steam library, built with GTK 4 and lib
 
 - **Your whole library in one place**: installed games, games you own but haven't installed, and non-Steam games.
 - **Find things quickly**: filter by Steam's collections or your own, search by name, initials or app ID, and sort or group by size, last played, release date or genre.
-- **A page for every game**: trailers, screenshots, news and install details. Play turns into Stop while it's running, and games can be uninstalled or removed from here.
+- **A page for every game**: trailers, screenshots, news and install details. Play turns into Stop while it's running, and games can be moved, uninstalled or removed from here.
 - **Launch options without the guesswork**: switch over 100 common settings on and off, with warnings for ones that clash or do nothing.
+- **Library folders**: see what each drive holds, and move, uninstall, hide or collect several games at once.
 - **Proton builds**: install and update GE-Proton and Proton-CachyOS from Preferences.
 - **The Steam store, natively**: browse with local prices, and manage your wishlist and cart.
 - **Downloads**: see what Steam's downloading, with progress on each game's cover, and start or resume updates without opening Steam.

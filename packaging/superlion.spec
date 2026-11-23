@@ -1,5 +1,5 @@
 Name:           superlion
-Version:        0.10.1
+Version:        0.11.0
 Release:        1%{?dist}
 Summary:        Native Linux app for your Steam library
 License:        GPL-3.0-or-later
@@ -65,6 +65,13 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/uk.co.solarflareit.Su
 %{_datadir}/dnf5/repos.override.d/50-superlion.repo
 
 %changelog
+* Mon Nov 23 2026 Tom <tom@solarflareit.co.uk> - 0.11.0-1
+- Move a Steam game to another library, with its Proton files and shader cache, without Steam downloading it again.
+- Move a non-Steam game's folder anywhere; its shortcut, launch options and artwork follow it.
+- Library folders in Preferences list their games, sizes and free space, and selected games can be moved, uninstalled, hidden, added to a collection or given a Proton version together.
+- Steam stays closed and Superlion holds other changes until a move finishes; quitting during one asks first.
+- Fixed a rare crash when a page with web content was freed in the background.
+
 * Wed Nov 18 2026 Tom <tom@solarflareit.co.uk> - 0.10.1-1
 - Update Now and Update All start the update as soon as Steam signs in, rather than waiting for its scheduled time.
 
