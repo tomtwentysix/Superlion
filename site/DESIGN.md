@@ -16,6 +16,7 @@ let the screenshots carry it.
 | `--primary` | `#a62233` | `#e0566a` | Buttons and links |
 | `--on-primary` | `#ffffff` | `#16130f` | Text on primary buttons |
 | `--brass` | `#8f620c` | `#d9a33a` | The one accent: eyebrows, rules beside headings |
+| `--ring` | `#000000` | `#ffffff` | Ring around the dedication photo |
 
 All text pairs reach 4.5:1 or better. No gradients.
 
